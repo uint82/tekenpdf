@@ -1,0 +1,20 @@
+#editor-view {
+  background-color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+
+  h1 {
+    padding: 1rem;
+    background: white;
+    border-bottom: 1px solid #ddd;
+  }
+
+  #canvas-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: auto;
+    padding: 20px;
+  }
+}
