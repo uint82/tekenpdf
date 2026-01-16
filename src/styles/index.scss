@@ -1,4 +1,8 @@
+@use "themes/light";
+@use "themes/dark";
+
 @use "core";
+@use "navbar";
 
 @use "pages/home";
 @use "pages/editor";
