@@ -1,5 +1,5 @@
 #editor-view {
-  background-color: #e2e8f0;
+  background-color: var(--bg);
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -7,7 +7,7 @@
   h1 {
     padding: 1rem;
     background: white;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
 
@@ -20,16 +20,16 @@
     padding: 40px;
     width: 100%;
     position: relative;
-    background-color: #e2e8f0;
+    background-color: var(--bg);
   }
 
   #the-canvas {
     display: block;
     max-width: 100%;
     height: auto;
-    background-color: white;
+    background-color: var(--bg);
     box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      0 4px 6px -1px var(--shadow),
+      0 2px 4px -1px var(--shadow);
   }
 }
