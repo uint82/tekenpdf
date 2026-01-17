@@ -1,0 +1,19 @@
+<footer class="main-footer">
+  <div class="footer-content">
+    <p class="copyright">
+      &copy; <span id="year"></span> Tekenpdf. Built with
+      <span style="color: var(--danger-color)">❤</span> by
+      <a href="https://github.com/uint82" target="_blank">Hilmi Abroor</a>
+    </p>
+
+    <div class="footer-links">
+      <a href="#">Privacy</a>
+      <span class="separator">•</span>
+      <a href="#">Terms</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+</script>
