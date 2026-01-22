@@ -1,17 +1,59 @@
 <section id="editor-view" class="page hidden">
-  <div
-    style="
-      padding: 10px;
-      background: white;
-      border-bottom: 1px solid #ddd;
-      margin-bottom: 10px;
-    "
-  >
-    <button id="back-btn">Kembali</button>
-    <span>Editor Mode</span>
+  <div class="editor-layout">
+    <aside class="editor-sidebar">
+      <div class="sidebar-header">
+        <button id="back-btn" class="btn-text">← Kembali</button>
+      </div>
+
+      <div class="tools-container">
+        <span class="tool-label">Toolbox</span>
+
+        <button id="btn-create-signature" class="tool-btn">
+          Buat Tanda Tangan
+        </button>
+
+        <button id="btn-add-text" class="tool-btn">Tambah Teks</button>
+
+        <span class="tool-label" style="margin-top: 20px">Actions</span>
+
+        <button
+          id="btn-delete-object"
+          class="tool-btn"
+          style="color: var(--danger-color); border-color: var(--danger-color)"
+        >
+          Hapus Seleksi
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="btn-save-pdf" class="btn-primary">Download PDF</button>
+      </div>
+    </aside>
+
+    <main id="canvas-scroll-area">
+      <div id="canvas-wrapper">
+        <canvas id="the-canvas"></canvas>
+
+        <canvas id="fabric-layer"></canvas>
+      </div>
+    </main>
   </div>
 
-  <div id="canvas-container">
-    <canvas id="the-canvas"></canvas>
+  <div id="signature-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3>Buat Tanda Tangan</h3>
+
+      <div class="drawing-area">
+        <canvas id="modal-pad" width="500" height="250"></canvas>
+      </div>
+
+      <div class="modal-actions">
+        <button id="btn-modal-clear" class="btn-text danger">Hapus</button>
+        <div class="right-actions">
+          <button id="btn-modal-cancel" class="btn-secondary">Batal</button>
+          <button id="btn-modal-save" class="btn-primary">Simpan</button>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
