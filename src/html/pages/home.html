@@ -1,6 +1,18 @@
 <section id="home-view" class="page">
-  <h1>Home Page</h1>
-  <div class="upload-container">
-    <input type="file" id="pdf-upload" accept="application/pdf" />
+  <h1>Tekenpdf ✍️</h1>
+  <p style="margin-bottom: 20px; color: var(--text-light)">
+    Tanda tangan PDF aman, gratis, dan tanpa upload server.
+  </p>
+
+  <div id="drop-zone" class="upload-container">
+    <h3>Upload PDF kamu disini</h3>
+    <p>atau</p>
+
+    <label for="pdf-upload" class="btn-primary" style="display: inline-block; margin-top: 10px; cursor: pointer">
+      Pilih File
+    </label>
+    <input type="file" id="pdf-upload" accept="application/pdf" style="display: none" />
+
+    <p class="hint">Maksimal 200MB dan 400 lembar (Client-side only)</p>
   </div>
 </section>
