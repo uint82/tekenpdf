@@ -209,6 +209,7 @@ function setupModalLogic() {
 function setupToolbarLogic() {
   const btnText = document.getElementById("btn-add-text");
   const btnStamp = document.getElementById("btn-tool-stamp");
+  const btnCheckbox = document.getElementById("btn-add-checkbox");
   const inputStamp = document.getElementById(
     "stamp-file-input",
   ) as HTMLInputElement;
@@ -268,6 +269,32 @@ function setupToolbarLogic() {
         });
       };
       reader.readAsDataURL(file);
+    };
+  }
+
+  if (btnCheckbox) {
+    btnCheckbox.onclick = () => {
+      const activeCanvas = getActiveFabricCanvas();
+      if (!activeCanvas) return;
+
+      const checkbox = new fabric.IText("✓", {
+        left: 50,
+        top: 50,
+        fontFamily: "Arial",
+        fontSize: 30,
+        fill: "#000000",
+        fontWeight: "bold",
+        cursorColor: "#2563eb",
+      });
+
+      activeCanvas.add(checkbox);
+      activeCanvas.setActiveObject(checkbox);
+
+      const fabricCanvasEl = activeCanvas.getElement();
+      const pageWrapper = fabricCanvasEl.closest(".page-wrapper");
+      if (pageWrapper) {
+        pageWrapper.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     };
   }
 
