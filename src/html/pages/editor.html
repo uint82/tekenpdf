@@ -5,23 +5,16 @@
     </main>
 
     <aside class="editor-sidebar">
-      <div
-        class="sidebar-header"
-        style="
+      <div class="sidebar-header" style="
           display: flex;
           justify-content: space-between;
           align-items: center;
           padding: 15px;
-        "
-      >
+        ">
         <div style="font-weight: 800; font-size: 1.1rem">
           Tekenpdf <i class="fa-solid fa-signature"></i>
         </div>
-        <button
-          id="theme-toggle-sidebar"
-          class="btn-text"
-          style="font-size: 1.2rem"
-        ></button>
+        <button id="theme-toggle-sidebar" class="btn-text" style="font-size: 1.2rem"></button>
       </div>
 
       <div class="file-info-card">
@@ -30,11 +23,7 @@
       </div>
 
       <div style="padding: 15px 15px">
-        <button
-          id="back-btn"
-          class="btn-text"
-          style="font-size: 0.9rem; color: var(--text-light)"
-        >
+        <button id="back-btn" class="btn-text" style="font-size: 0.9rem; color: var(--text-light)">
           ← Kembali ke Home
         </button>
       </div>
@@ -43,49 +32,32 @@
         <span class="tool-label">Toolbox</span>
         <button id="btn-create-signature" class="tool-btn">Tanda Tangan</button>
         <button id="btn-add-text" class="tool-btn">Tambah Teks</button>
+        <button id="btn-add-checkbox" class="tool-btn">Tambah Ceklis</button>
         <button id="btn-tool-stamp" class="tool-btn">Upload Gambar</button>
 
-        <input
-          type="file"
-          id="stamp-file-input"
-          accept="image/*"
-          style="display: none"
-        />
+        <input type="file" id="stamp-file-input" accept="image/*" style="display: none" />
 
         <span class="tool-label" style="margin-top: 20px">Actions</span>
-        <button
-          id="btn-delete-object"
-          class="tool-btn"
-          style="color: var(--danger-color); border-color: var(--danger-color)"
-        >
+        <button id="btn-delete-object" class="tool-btn"
+          style="color: var(--danger-color); border-color: var(--danger-color)">
           Hapus Seleksi
         </button>
       </div>
 
       <div class="sidebar-footer">
-        <button
-          id="btn-save-pdf"
-          class="btn-primary"
-          style="margin-bottom: 15px"
-        >
+        <button id="btn-save-pdf" class="btn-primary" style="margin-bottom: 15px">
           Download PDF
         </button>
 
-        <div
-          style="
+        <div style="
             font-size: 0.75rem;
             color: var(--text-light);
             text-align: center;
             padding-top: 10px;
-          "
-        >
+          ">
           &copy; <span id="year-sidebar">2026</span> Tekenpdf.<br />
-          <a
-            href="https://github.com/uint82/tekenpdf"
-            target="_blank"
-            style="color: var(--text-light); text-decoration: underline"
-            >Github</a
-          >
+          <a href="https://github.com/uint82/tekenpdf" target="_blank"
+            style="color: var(--text-light); text-decoration: underline">Github</a>
         </div>
       </div>
     </aside>
