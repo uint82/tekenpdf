@@ -1,3 +1,4 @@
+import "@fortawesome/fontawesome-free/css/all.css";
 import "../styles/index.scss";
 import { router } from "./utils/router";
 import { HomePage } from "./pages/home";
