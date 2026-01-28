@@ -10,12 +10,16 @@ import type { Page } from "../utils/router";
 const fabricPages = new Map<number, fabric.Canvas>();
 let pdfDoc: any = null;
 let modalPad: SignaturePad | null = null;
+let activeTool: "select" | "text" | "checkbox" = "select";
 
 export const EditorPage: Page = {
   async mount() {
     document.body.classList.add("editor-mode");
     setupThemeButton("theme-toggle-sidebar");
-    console.log("Mounting Editor (Multi-Page Mode)...");
+    console.log("Mounting Editor (Click-to-Place Mode)...");
+
+    activeTool = "select";
+    updateToolbarVisuals();
 
     const file = appStore.getFile();
     if (!file) {
@@ -76,6 +80,14 @@ export const EditorPage: Page = {
           lowerCanvasEl.style.width = dims.styleWidth;
           lowerCanvasEl.style.height = dims.styleHeight;
 
+          fCanvas.on("mouse:down", (opt) => {
+            handleCanvasClick(fCanvas, opt);
+          });
+
+          fCanvas.on("mouse:over", () => {
+            updateCanvasCursor(fCanvas);
+          });
+
           fabricPages.set(pageNum, fCanvas);
         }
       }
@@ -123,6 +135,98 @@ export const EditorPage: Page = {
   },
 };
 
+function setActiveTool(tool: "select" | "text" | "checkbox") {
+  activeTool = tool;
+  updateToolbarVisuals();
+
+  fabricPages.forEach((canvas) => {
+    canvas.selection = tool === "select";
+
+    updateCanvasCursor(canvas);
+
+    canvas.requestRenderAll();
+  });
+}
+
+function updateToolbarVisuals() {
+  const btnText = document.getElementById("btn-add-text");
+  const btnCheck = document.getElementById("btn-add-checkbox");
+
+  btnText?.classList.remove("active");
+  btnCheck?.classList.remove("active");
+
+  if (activeTool === "text") btnText?.classList.add("active");
+  if (activeTool === "checkbox") btnCheck?.classList.add("active");
+}
+
+function updateCanvasCursor(canvas: fabric.Canvas) {
+  if (activeTool === "text") {
+    canvas.defaultCursor = "text";
+    canvas.hoverCursor = "move";
+  } else if (activeTool === "checkbox") {
+    canvas.defaultCursor = "copy";
+    canvas.hoverCursor = "move";
+  } else {
+    canvas.defaultCursor = "default";
+    canvas.hoverCursor = "move";
+  }
+}
+
+function handleCanvasClick(canvas: fabric.Canvas, opt: fabric.IEvent) {
+  if (opt.target) {
+    return;
+  }
+
+  if (activeTool === "select") return;
+
+  const pointer = canvas.getPointer(opt.e);
+
+  if (activeTool === "text") {
+    const text = new fabric.IText("Ketik disini...", {
+      left: pointer.x,
+      top: pointer.y,
+      fontFamily: "Inter, sans-serif",
+      fontSize: 20,
+      fill: "#000000",
+      cursorColor: "#2563eb",
+    });
+    canvas.add(text);
+    canvas.setActiveObject(text);
+    text.enterEditing();
+    text.selectAll();
+  } else if (activeTool === "checkbox") {
+    const checkbox = new fabric.IText("✓", {
+      originX: "center",
+      originY: "center",
+      left: pointer.x,
+      top: pointer.y,
+
+      fontFamily: "Arial",
+      fontSize: 30,
+      fill: "#000000",
+      fontWeight: "bold",
+      backgroundColor: "rgba(0,0,0,0.05)",
+      editable: false,
+      ...({ isCheckbox: true } as any),
+    });
+
+    canvas.add(checkbox);
+
+    const w = checkbox.getScaledWidth();
+    const h = checkbox.getScaledHeight();
+
+    checkbox.set({
+      originX: "left",
+      originY: "top",
+      left: pointer.x - w / 2,
+      top: pointer.y - h / 2,
+    });
+
+    checkbox.setCoords();
+    canvas.requestRenderAll();
+  }
+}
+
 function getActiveFabricCanvas(): fabric.Canvas | null {
   if (fabricPages.size === 1) return fabricPages.get(1) || null;
 
@@ -130,7 +234,6 @@ function getActiveFabricCanvas(): fabric.Canvas | null {
   if (!container) return fabricPages.get(1) || null;
 
   const containerCenter = container.scrollTop + container.clientHeight / 2;
-
   let activePage = 1;
   let minDiff = Infinity;
 
@@ -139,7 +242,6 @@ function getActiveFabricCanvas(): fabric.Canvas | null {
     if (el) {
       const elCenter = el.offsetTop + el.offsetHeight / 2;
       const diff = Math.abs(containerCenter - elCenter);
-
       if (diff < minDiff) {
         minDiff = diff;
         activePage = pageNum;
@@ -160,6 +262,7 @@ function setupModalLogic() {
 
   if (btnCreate) {
     btnCreate.onclick = () => {
+      setActiveTool("select");
       modal?.classList.remove("hidden");
       if (!modalPad && padCanvas) {
         modalPad = new SignaturePad(padCanvas);
@@ -175,16 +278,13 @@ function setupModalLogic() {
   if (btnSave) {
     btnSave.onclick = () => {
       if (!modalPad) return;
-
       const activeCanvas = getActiveFabricCanvas();
       if (!activeCanvas) {
         alert("Tidak ada halaman aktif!");
         closeModal();
         return;
       }
-
       const signatureImage = modalPad.canvas.toDataURL("image/png");
-
       fabric.Image.fromURL(signatureImage, (img) => {
         img.set({
           left: 100,
@@ -195,12 +295,14 @@ function setupModalLogic() {
           cornerColor: "#2563eb",
           transparentCorners: false,
         });
-
         activeCanvas.add(img);
         activeCanvas.setActiveObject(img);
         activeCanvas.requestRenderAll();
-      });
 
+        const fabricEl = activeCanvas.getElement();
+        const pageWrapper = fabricEl.closest(".page-wrapper");
+        pageWrapper?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       closeModal();
     };
   }
@@ -217,38 +319,26 @@ function setupToolbarLogic() {
 
   if (btnText) {
     btnText.onclick = () => {
-      const activeCanvas = getActiveFabricCanvas();
-      if (!activeCanvas) return;
+      if (activeTool === "text") setActiveTool("select");
+      else setActiveTool("text");
+    };
+  }
 
-      const text = new fabric.IText("Ketik disini...", {
-        left: 50,
-        top: 50,
-        fontFamily: "Inter, sans-serif",
-        fontSize: 20,
-        fill: "#000000",
-        cursorColor: "#2563eb",
-      });
-
-      activeCanvas.add(text);
-      activeCanvas.setActiveObject(text);
-      text.enterEditing();
-      text.selectAll();
-
-      const fabricCanvasEl = activeCanvas.getElement();
-      const pageWrapper = fabricCanvasEl.closest(".page-wrapper");
-
-      if (pageWrapper) {
-        pageWrapper.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+  if (btnCheckbox) {
+    btnCheckbox.onclick = () => {
+      if (activeTool === "checkbox") setActiveTool("select");
+      else setActiveTool("checkbox");
     };
   }
 
   if (btnStamp && inputStamp) {
-    btnStamp.onclick = () => inputStamp.click();
+    btnStamp.onclick = () => {
+      setActiveTool("select");
+      inputStamp.click();
+    };
     inputStamp.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       const activeCanvas = getActiveFabricCanvas();
-
       if (!file || !activeCanvas) return;
 
       const reader = new FileReader();
@@ -266,35 +356,13 @@ function setupToolbarLogic() {
           activeCanvas.add(img);
           activeCanvas.setActiveObject(img);
           inputStamp.value = "";
+
+          const fabricEl = activeCanvas.getElement();
+          const pageWrapper = fabricEl.closest(".page-wrapper");
+          pageWrapper?.scrollIntoView({ behavior: "smooth", block: "center" });
         });
       };
       reader.readAsDataURL(file);
-    };
-  }
-
-  if (btnCheckbox) {
-    btnCheckbox.onclick = () => {
-      const activeCanvas = getActiveFabricCanvas();
-      if (!activeCanvas) return;
-
-      const checkbox = new fabric.IText("✓", {
-        left: 50,
-        top: 50,
-        fontFamily: "Arial",
-        fontSize: 30,
-        fill: "#000000",
-        fontWeight: "bold",
-        cursorColor: "#2563eb",
-      });
-
-      activeCanvas.add(checkbox);
-      activeCanvas.setActiveObject(checkbox);
-
-      const fabricCanvasEl = activeCanvas.getElement();
-      const pageWrapper = fabricCanvasEl.closest(".page-wrapper");
-      if (pageWrapper) {
-        pageWrapper.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
     };
   }
 
