@@ -20,58 +20,73 @@ export async function savePdf(
 
       const pdfPage = pages[i];
       const { width: pdfWidth, height: pdfHeight } = pdfPage.getSize();
-
       const fabricWidth = fabricCanvas.width || 0;
       const totalScale = fabricWidth / pdfWidth;
 
       const objects = fabricCanvas.getObjects();
 
       for (const obj of objects) {
-        if (obj.left === undefined || obj.top === undefined) continue;
+        if (!obj.visible) continue;
 
-        const x = obj.left / totalScale;
-        const y = pdfHeight - obj.top / totalScale;
-
-        const objScaleX = (obj.scaleX || 1) / totalScale;
-        const objScaleY = (obj.scaleY || 1) / totalScale;
+        const bound = obj.getBoundingRect(true, true);
+        const x = bound.left / totalScale;
+        const yTop = pdfHeight - bound.top / totalScale;
+        const finalWidth = bound.width / totalScale;
+        const finalHeight = bound.height / totalScale;
 
         if (obj instanceof fabric.Image) {
-          const imgElement = obj.getElement() as HTMLImageElement;
-          const imgBytes = await fetch(imgElement.src).then((res) =>
-            res.arrayBuffer(),
-          );
+          try {
+            const pngDataUrl = obj.toDataURL({ format: "png", multiplier: 2 });
 
-          const pngImage = await pdfDoc.embedPng(imgBytes);
+            const pngImageBytes = await fetch(pngDataUrl).then((res) =>
+              res.arrayBuffer(),
+            );
+            const pdfImage = await pdfDoc.embedPng(pngImageBytes);
 
-          const finalWidth = (obj.width || 0) * objScaleX;
-          const finalHeight = (obj.height || 0) * objScaleY;
+            pdfPage.drawImage(pdfImage, {
+              x: x,
+              y: yTop - finalHeight,
+              width: finalWidth,
+              height: finalHeight,
+            });
+          } catch (imgErr) {
+            console.error("Gagal embed image:", imgErr);
+          }
+        } else if ((obj as any).isCheckbox) {
+          try {
+            const pngDataUrl = obj.toDataURL({ format: "png", multiplier: 4 });
+            const pngImageBytes = await fetch(pngDataUrl).then((res) =>
+              res.arrayBuffer(),
+            );
+            const pdfImage = await pdfDoc.embedPng(pngImageBytes);
 
-          pdfPage.drawImage(pngImage, {
-            x: x,
-            y: y - finalHeight,
-            width: finalWidth,
-            height: finalHeight,
-          });
+            pdfPage.drawImage(pdfImage, {
+              x: x,
+              y: yTop - finalHeight,
+              width: finalWidth,
+              height: finalHeight,
+            });
+          } catch (err) {
+            console.error("Gagal save checkbox:", err);
+          }
         } else if (obj instanceof fabric.IText) {
           const text = obj.text || "";
-
-          const fontSize = (obj.fontSize || 20) * objScaleY;
-          const color = rgb(0, 0, 0);
+          const fontSize =
+            ((obj.fontSize || 20) * (obj.scaleY || 1)) / totalScale;
 
           pdfPage.drawText(text, {
             x: x,
-            y: y - fontSize + fontSize * 0.2,
+            y: yTop - fontSize + fontSize * 0.12,
             size: fontSize,
             font: helveticaFont,
-            color: color,
+            color: rgb(0, 0, 0),
           });
         }
       }
     }
 
     const pdfBytes = await pdfDoc.save();
-
-    const blob = new Blob([pdfBytes as any], { type: "application/pdf" });
+    const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -81,6 +96,6 @@ export async function savePdf(
     document.body.removeChild(link);
   } catch (error) {
     console.error("Gagal menyimpan PDF:", error);
-    alert("Terjadi kesalahan saat menyimpan PDF.");
+    alert("Gagal menyimpan PDF. Cek console untuk detail error.");
   }
 }
