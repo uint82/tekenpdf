@@ -110,7 +110,21 @@
         border-color: var(--accent);
         background: var(--bg-surface);
       }
+
+      &.active {
+        background-color: var(--accent);
+        color: var(--accent-text);
+        border-color: var(--accent);
+      }
     }
+  }
+
+  .cursor-text {
+    cursor: text !important;
+  }
+
+  .cursor-pointer {
+    cursor: crosshair !important;
   }
 
   .sidebar-footer {
