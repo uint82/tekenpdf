@@ -88,6 +88,95 @@ export const EditorPage: Page = {
             updateCanvasCursor(fCanvas);
           });
 
+          fCanvas.on("mouse:dblclick", (opt) => {
+            const target = opt.target;
+
+            if (
+              target &&
+              (target as any).isCheckbox &&
+              target instanceof fabric.Path
+            ) {
+              const t = target as any;
+
+              const centerX = target.left || 0;
+              const centerY = target.top || 0;
+
+              const currentScaleX = target.scaleX || 1.5;
+              const currentScaleY = target.scaleY || 1.5;
+              const currentAngle = target.angle || 0;
+
+              const currentType = t.checkboxType;
+
+              let newPathString = "";
+              let newFill = "";
+              let newType = "";
+
+              if (currentType === "check") {
+                newPathString =
+                  "M12.06 5.44a0.75 0.75 0 0 0 -1.06 0L8 8.44 5.01 5.44a0.75 0.75 0 1 0 -1.06 1.06L6.94 9.5l-3 3.01a0.75 0.75 0 0 0 1.06 1.06L8 10.56l2.99 3.01a0.75 0.75 0 0 0 1.06 -1.06L9.06 9.5l2.99 -3a0.75 0.75 0 0 0 0 -1.06z";
+
+                newFill = "#ef4444";
+                newType = "cross";
+              } else {
+                newPathString =
+                  "M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z";
+                newFill = "black";
+                newType = "check";
+              }
+
+              fCanvas.remove(target);
+
+              const newCheckbox = new fabric.Path(newPathString, {
+                left: centerX,
+                top: centerY,
+                originX: "center",
+                originY: "center",
+                fill: newFill,
+                stroke: "",
+
+                scaleX: currentScaleX,
+                scaleY: currentScaleY,
+                angle: currentAngle,
+
+                objectCaching: false,
+                ...({ isCheckbox: true, checkboxType: newType } as any),
+              });
+
+              fCanvas.add(newCheckbox);
+              fCanvas.setActiveObject(newCheckbox);
+              fCanvas.requestRenderAll();
+            }
+          });
+
+          const upperCanvasEl = fCanvas.getElement();
+          const canvasWrapper = upperCanvasEl.parentElement;
+
+          const pageWrapperEl = document.getElementById(`page-${pageNum}`);
+
+          if (canvasWrapper && pageWrapperEl) {
+            canvasWrapper.addEventListener("dragenter", (e) => {
+              e.preventDefault();
+              pageWrapperEl.classList.add("drop-active");
+            });
+
+            canvasWrapper.addEventListener("dragleave", (e) => {
+              e.preventDefault();
+              pageWrapperEl.classList.remove("drop-active");
+            });
+
+            canvasWrapper.addEventListener("dragover", (e) => {
+              e.preventDefault();
+              e.dataTransfer!.dropEffect = "copy";
+              pageWrapperEl.classList.add("drop-active");
+            });
+
+            canvasWrapper.addEventListener("drop", (e) => {
+              e.preventDefault();
+              pageWrapperEl.classList.remove("drop-active");
+              handleDrop(e, fCanvas);
+            });
+          }
+
           fabricPages.set(pageNum, fCanvas);
         }
       }
@@ -195,61 +284,108 @@ function handleCanvasClick(canvas: fabric.Canvas, opt: fabric.IEvent) {
     text.enterEditing();
     text.selectAll();
   } else if (activeTool === "checkbox") {
-    const checkbox = new fabric.IText("✓", {
-      originX: "center",
-      originY: "center",
+    const checkPath =
+      "M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z";
+
+    const checkbox = new fabric.Path(checkPath, {
       left: pointer.x,
       top: pointer.y,
+      originX: "center",
+      originY: "center",
 
-      fontFamily: "Arial",
-      fontSize: 30,
-      fill: "#000000",
-      fontWeight: "bold",
-      backgroundColor: "rgba(0,0,0,0.05)",
-      editable: false,
-      ...({ isCheckbox: true } as any),
+      fill: "black",
+      stroke: null,
+
+      scaleX: 1.5,
+      scaleY: 1.5,
+      objectCaching: false,
+
+      ...({ isCheckbox: true, checkboxType: "check" } as any),
     });
 
     canvas.add(checkbox);
-
-    const w = checkbox.getScaledWidth();
-    const h = checkbox.getScaledHeight();
-
-    checkbox.set({
-      originX: "left",
-      originY: "top",
-      left: pointer.x - w / 2,
-      top: pointer.y - h / 2,
-    });
-
-    checkbox.setCoords();
     canvas.requestRenderAll();
   }
 }
 
-function getActiveFabricCanvas(): fabric.Canvas | null {
-  if (fabricPages.size === 1) return fabricPages.get(1) || null;
+function handleDrop(e: DragEvent, canvas: fabric.Canvas) {
+  const imgSrc = e.dataTransfer?.getData("image-src");
+  if (!imgSrc) return;
 
-  const container = document.getElementById("canvas-scroll-area");
-  if (!container) return fabricPages.get(1) || null;
+  const wrapper = canvas.getElement().closest(".page-wrapper");
+  wrapper?.classList.remove("drop-active");
 
-  const containerCenter = container.scrollTop + container.clientHeight / 2;
-  let activePage = 1;
-  let minDiff = Infinity;
+  const rect = canvas.getElement().getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
 
-  fabricPages.forEach((_, pageNum) => {
-    const el = document.getElementById(`page-${pageNum}`);
-    if (el) {
-      const elCenter = el.offsetTop + el.offsetHeight / 2;
-      const diff = Math.abs(containerCenter - elCenter);
-      if (diff < minDiff) {
-        minDiff = diff;
-        activePage = pageNum;
-      }
+  fabric.Image.fromURL(imgSrc, (img) => {
+    const targetWidth = 300;
+
+    let scale = 1;
+    if (img.width && img.width > targetWidth) {
+      scale = targetWidth / img.width;
     }
-  });
 
-  return fabricPages.get(activePage) || null;
+    img.set({
+      left: x,
+      top: y,
+      originX: "center",
+      originY: "center",
+      scaleX: scale,
+      scaleY: scale,
+      borderColor: "#2563eb",
+      cornerColor: "#2563eb",
+      transparentCorners: false,
+    });
+
+    canvas.add(img);
+    canvas.setActiveObject(img);
+    canvas.requestRenderAll();
+    setActiveTool("select");
+  });
+}
+
+function addDraggableAsset(imgSrc: string) {
+  const container = document.getElementById("assets-container");
+  const emptyHint = container?.querySelector(".empty-hint");
+
+  if (container) {
+    if (emptyHint) emptyHint.remove();
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "asset-wrapper";
+
+    const img = document.createElement("img");
+    img.src = imgSrc;
+    img.className = "draggable-item";
+    img.draggable = true;
+
+    img.addEventListener("dragstart", (e) => {
+      if (e.dataTransfer) {
+        e.dataTransfer.setData("image-src", imgSrc);
+        e.dataTransfer.effectAllowed = "copy";
+      }
+    });
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "btn-remove-asset";
+    btnDel.innerHTML = '<i class="fa-solid fa-times"></i>';
+    btnDel.title = "Hapus Aset";
+
+    btnDel.onclick = () => {
+      wrapper.remove();
+
+      if (container.children.length === 0) {
+        container.innerHTML = `<p class="empty-hint">Belum ada aset. Buat tanda tangan atau upload gambar dulu.
+</p>`;
+      }
+    };
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(btnDel);
+    container.appendChild(wrapper);
+  }
 }
 
 function setupModalLogic() {
@@ -278,31 +414,8 @@ function setupModalLogic() {
   if (btnSave) {
     btnSave.onclick = () => {
       if (!modalPad) return;
-      const activeCanvas = getActiveFabricCanvas();
-      if (!activeCanvas) {
-        alert("Tidak ada halaman aktif!");
-        closeModal();
-        return;
-      }
       const signatureImage = modalPad.canvas.toDataURL("image/png");
-      fabric.Image.fromURL(signatureImage, (img) => {
-        img.set({
-          left: 100,
-          top: 100,
-          scaleX: 0.5,
-          scaleY: 0.5,
-          borderColor: "#2563eb",
-          cornerColor: "#2563eb",
-          transparentCorners: false,
-        });
-        activeCanvas.add(img);
-        activeCanvas.setActiveObject(img);
-        activeCanvas.requestRenderAll();
-
-        const fabricEl = activeCanvas.getElement();
-        const pageWrapper = fabricEl.closest(".page-wrapper");
-        pageWrapper?.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
+      addDraggableAsset(signatureImage);
       closeModal();
     };
   }
@@ -333,34 +446,20 @@ function setupToolbarLogic() {
 
   if (btnStamp && inputStamp) {
     btnStamp.onclick = () => {
-      setActiveTool("select");
       inputStamp.click();
     };
+
     inputStamp.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      const activeCanvas = getActiveFabricCanvas();
-      if (!file || !activeCanvas) return;
+      if (!file) return;
 
       const reader = new FileReader();
       reader.onload = (f) => {
         const data = f.target?.result as string;
-        fabric.Image.fromURL(data, (img) => {
-          const maxWidth = 150;
-          const scale = maxWidth / (img.width || 1);
-          img.set({
-            left: 100,
-            top: 100,
-            scaleX: scale,
-            scaleY: scale,
-          });
-          activeCanvas.add(img);
-          activeCanvas.setActiveObject(img);
-          inputStamp.value = "";
-
-          const fabricEl = activeCanvas.getElement();
-          const pageWrapper = fabricEl.closest(".page-wrapper");
-          pageWrapper?.scrollIntoView({ behavior: "smooth", block: "center" });
-        });
+        addDraggableAsset(data);
+        inputStamp.value = "";
+        // optional: bisa langsung taruh signature di canvas setelah user click save
+        // optional: we can put the signature in canvas once the user click save
       };
       reader.readAsDataURL(file);
     };
