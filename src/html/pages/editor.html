@@ -30,6 +30,11 @@
 
       <div class="tools-container">
         <span class="tool-label">Toolbox</span>
+        <div id="assets-container" class="assets-grid">
+          <p class="empty-hint">
+            Belum ada aset. Buat tanda tangan atau upload gambar dulu.
+          </p>
+        </div>
         <button id="btn-create-signature" class="tool-btn">Tanda Tangan</button>
         <button id="btn-add-text" class="tool-btn">Tambah Teks</button>
         <button id="btn-add-checkbox" class="tool-btn">Tambah Ceklis</button>
@@ -38,8 +43,7 @@
         <input type="file" id="stamp-file-input" accept="image/*" style="display: none" />
 
         <span class="tool-label" style="margin-top: 20px">Actions</span>
-        <button id="btn-delete-object" class="tool-btn"
-          style="color: var(--danger-color); border-color: var(--danger-color)">
+        <button id="btn-delete-object" class="tool-btn" style="color: var(--color); border-color: var(--border)">
           Hapus Seleksi
         </button>
       </div>
