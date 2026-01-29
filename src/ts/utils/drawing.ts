@@ -1,121 +1,179 @@
+import { getStroke } from "perfect-freehand";
+
+interface Point {
+  x: number;
+  y: number;
+  pressure?: number;
+  time?: number;
+}
+
 export class SignaturePad {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  isDrawing: boolean = false;
+  container: HTMLElement;
+  svg: SVGSVGElement;
+  path: SVGPathElement | null = null;
 
-  lastX: number = 0;
-  lastY: number = 0;
+  private isDrawing = false;
+  private points: Point[] = [];
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    const context = canvas.getContext("2d");
+  private strokes: string[] = [];
 
-    if (!context) throw new Error("Ink canvas context error");
-    this.ctx = context;
+  private strokeColor = "#000000";
 
-    this.ctx.lineCap = "round";
-    this.ctx.lineJoin = "round";
-    this.ctx.strokeStyle = "#000000"; // hitam
-    this.ctx.lineWidth = 2;
+  private options = {
+    size: 5,
+    thinning: 0.3,
+    smoothing: 0.5,
+    streamline: 0.4,
+    easing: (t: number) => t,
+    start: {
+      taper: 0,
+      easing: (t: number) => t,
+    },
+    end: {
+      taper: 0,
+      easing: (t: number) => t,
+    },
+  };
+
+  constructor(container: HTMLElement) {
+    this.container = container;
+
+    this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    this.svg.setAttribute("width", "100%");
+    this.svg.setAttribute("height", "100%");
+    this.svg.style.touchAction = "none";
+    this.svg.style.userSelect = "none";
+
+    this.container.appendChild(this.svg);
 
     this.bindEvents();
   }
 
-  private bindEvents() {
-    this.canvas.addEventListener("mousedown", (e) =>
-      this.start(e.offsetX, e.offsetY),
-    );
-    this.canvas.addEventListener("mousemove", (e) =>
-      this.move(e.offsetX, e.offsetY),
-    );
-    this.canvas.addEventListener("mouseup", () => this.end());
-    this.canvas.addEventListener("mouseout", () => this.end());
+  private startStroke(point: Point) {
+    this.isDrawing = true;
+    this.points = [point];
 
-    this.canvas.addEventListener(
-      "touchstart",
-      (e) => {
-        if (e.cancelable) e.preventDefault();
-        const pos = this.getTouchPos(e);
-        this.start(pos.x, pos.y);
-      },
-      { passive: false },
-    );
+    this.path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    this.path.setAttribute("fill", this.strokeColor);
+    this.svg.appendChild(this.path);
 
-    this.canvas.addEventListener(
-      "touchmove",
-      (e) => {
-        if (e.cancelable) e.preventDefault();
-        const pos = this.getTouchPos(e);
-        this.move(pos.x, pos.y);
-      },
-      { passive: false },
-    );
-
-    this.canvas.addEventListener("touchend", () => this.end());
+    this.render();
   }
 
-  private getTouchPos(e: TouchEvent) {
-    const rect = this.canvas.getBoundingClientRect();
+  private moveStroke(point: Point) {
+    if (!this.isDrawing || !this.path) return;
+    this.points.push(point);
+    this.render();
+  }
+
+  private endStroke() {
+    if (!this.isDrawing || !this.path) return;
+    this.isDrawing = false;
+
+    const d = this.path.getAttribute("d");
+    if (d) this.strokes.push(d);
+  }
+
+  private render() {
+    if (!this.path) return;
+    const stroke = getStroke(this.points, this.options);
+    const d = this.getSvgPathFromStroke(stroke);
+    this.path.setAttribute("d", d);
+  }
+
+  private getSvgPathFromStroke(stroke: number[][]): string {
+    if (!stroke.length) return "";
+    const d = stroke.reduce(
+      (acc, [x0, y0], i, arr) => {
+        const [x1, y1] = arr[(i + 1) % arr.length];
+        acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+        return acc;
+      },
+      ["M", ...stroke[0], "Q"],
+    );
+    d.push("Z");
+    return d.join(" ");
+  }
+
+  private bindEvents() {
+    this.container.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      this.container.setPointerCapture(e.pointerId);
+      this.startStroke(this.getPoint(e));
+    });
+
+    this.container.addEventListener("pointermove", (e) => {
+      if (!this.isDrawing) return;
+      if (e.cancelable) e.preventDefault();
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      for (const ev of events) {
+        this.moveStroke(this.getPoint(ev));
+      }
+    });
+
+    const end = (e: PointerEvent) => {
+      this.endStroke();
+      this.container.releasePointerCapture(e.pointerId);
+    };
+
+    this.container.addEventListener("pointerup", end);
+    this.container.addEventListener("pointercancel", end);
+  }
+
+  private getPoint(e: PointerEvent): Point {
+    const rect = this.container.getBoundingClientRect();
     return {
-      x: e.touches[0].clientX - rect.left,
-      y: e.touches[0].clientY - rect.top,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      pressure: e.pressure,
+      time: Date.now(),
     };
   }
 
-  private start(x: number, y: number) {
-    this.isDrawing = true;
-    this.lastX = x;
-    this.lastY = y;
-
-    this.ctx.beginPath();
-    this.ctx.moveTo(x, y);
-
-    this.ctx.fillStyle = this.ctx.strokeStyle;
-    this.ctx.fillRect(x - 0.5, y - 0.5, 1, 1);
+  set penColor(color: string) {
+    this.strokeColor = color;
   }
 
-  private move(x: number, y: number) {
-    if (!this.isDrawing) return;
+  recolor(color: string) {
+    this.penColor = color;
 
-    this.ctx.beginPath();
-    this.ctx.moveTo(this.lastX, this.lastY);
-    this.ctx.lineTo(x, y);
-    this.ctx.stroke();
-
-    this.lastX = x;
-    this.lastY = y;
-  }
-
-  private end() {
-    this.isDrawing = false;
-    this.ctx.closePath();
-  }
-
-  matchSize(
-    width: number,
-    height: number,
-    cssWidth: string,
-    cssHeight: string,
-  ) {
-    this.canvas.width = width;
-    this.canvas.height = height;
-
-    this.canvas.style.width = cssWidth;
-    this.canvas.style.height = cssHeight;
-
-    const dpr = window.devicePixelRatio || 1;
-    this.ctx.scale(dpr, dpr);
-
-    this.ctx.lineCap = "round";
-    this.ctx.lineJoin = "round";
-    this.ctx.lineWidth = 2;
-    this.ctx.strokeStyle = "#000000";
+    const paths = this.svg.querySelectorAll("path");
+    paths.forEach((p) => p.setAttribute("fill", color));
   }
 
   clear() {
-    this.ctx.save();
-    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.restore();
+    this.strokes = [];
+    this.points = [];
+    while (this.svg.firstChild) {
+      this.svg.removeChild(this.svg.firstChild);
+    }
+  }
+
+  isEmpty() {
+    return this.strokes.length === 0;
+  }
+
+  toDataURL(): string {
+    const rect = this.container.getBoundingClientRect();
+    const canvas = document.createElement("canvas");
+    const scale = 2;
+    canvas.width = rect.width * scale;
+    canvas.height = rect.height * scale;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return "";
+    ctx.scale(scale, scale);
+
+    const paths = this.svg.querySelectorAll("path");
+    paths.forEach((p) => {
+      const color = p.getAttribute("fill") || this.strokeColor;
+      ctx.fillStyle = color;
+
+      const d = p.getAttribute("d");
+      if (d) ctx.fill(new Path2D(d));
+    });
+
+    return canvas.toDataURL("image/png");
   }
 }
