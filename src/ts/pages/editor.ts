@@ -12,6 +12,10 @@ let pdfDoc: any = null;
 let modalPad: SignaturePad | null = null;
 let activeTool: "select" | "text" | "checkbox" = "select";
 
+let activeSignatureTab: "draw" | "type" | "image" = "draw";
+let activeSignatureColor: string = "#000000";
+let activeSignatureFont: string = "'Caveat', cursive";
+
 export const EditorPage: Page = {
   async mount() {
     document.body.classList.add("editor-mode");
@@ -71,14 +75,17 @@ export const EditorPage: Page = {
 
         if (dims) {
           const fCanvas = new fabric.Canvas(fabricCanvasEl.id, {
-            width: dims.width,
-            height: dims.height,
+            width: parseInt(dims.styleWidth, 10),
+            height: parseInt(dims.styleHeight, 10),
             selection: true,
+            enableRetinaScaling: true,
           });
 
-          const lowerCanvasEl = fCanvas.getElement();
-          lowerCanvasEl.style.width = dims.styleWidth;
-          lowerCanvasEl.style.height = dims.styleHeight;
+          (fCanvas as any).pdfInfo = {
+            precisionScale: dims.precisionScale,
+            viewportWidth: dims.viewportWidth,
+            pageNumber: pageNum,
+          };
 
           fCanvas.on("mouse:down", (opt) => {
             handleCanvasClick(fCanvas, opt);
@@ -90,21 +97,17 @@ export const EditorPage: Page = {
 
           fCanvas.on("mouse:dblclick", (opt) => {
             const target = opt.target;
-
             if (
               target &&
               (target as any).isCheckbox &&
               target instanceof fabric.Path
             ) {
               const t = target as any;
-
               const centerX = target.left || 0;
               const centerY = target.top || 0;
-
               const currentScaleX = target.scaleX || 1.5;
               const currentScaleY = target.scaleY || 1.5;
               const currentAngle = target.angle || 0;
-
               const currentType = t.checkboxType;
 
               let newPathString = "";
@@ -113,8 +116,7 @@ export const EditorPage: Page = {
 
               if (currentType === "check") {
                 newPathString =
-                  "M12.06 5.44a0.75 0.75 0 0 0 -1.06 0L8 8.44 5.01 5.44a0.75 0.75 0 1 0 -1.06 1.06L6.94 9.5l-3 3.01a0.75 0.75 0 0 0 1.06 1.06L8 10.56l2.99 3.01a0.75 0.75 0 0 0 1.06 -1.06L9.06 9.5l2.99 -3a0.75 0.75 0 0 0 0 -1.06z";
-
+                  "M13.08 5.44a0.94 0.75 0 0 0 -1.33 0L8 8.44 4.26 5.44a0.94 0.75 0 1 0 -1.33 1.06L6.68 9.5l-3.75 3.01a0.94 0.75 0 0 0 1.33 1.06L8 10.56l3.74 3.01a0.94 0.75 0 0 0 1.33 -1.06L9.33 9.5l3.74 -3a0.94 0.75 0 0 0 0 -1.06z";
                 newFill = "#ef4444";
                 newType = "cross";
               } else {
@@ -125,23 +127,19 @@ export const EditorPage: Page = {
               }
 
               fCanvas.remove(target);
-
               const newCheckbox = new fabric.Path(newPathString, {
                 left: centerX,
                 top: centerY,
                 originX: "center",
                 originY: "center",
                 fill: newFill,
-                stroke: "",
-
+                stroke: null,
                 scaleX: currentScaleX,
                 scaleY: currentScaleY,
                 angle: currentAngle,
-
                 objectCaching: false,
                 ...({ isCheckbox: true, checkboxType: newType } as any),
               });
-
               fCanvas.add(newCheckbox);
               fCanvas.setActiveObject(newCheckbox);
               fCanvas.requestRenderAll();
@@ -150,7 +148,6 @@ export const EditorPage: Page = {
 
           const upperCanvasEl = fCanvas.getElement();
           const canvasWrapper = upperCanvasEl.parentElement;
-
           const pageWrapperEl = document.getElementById(`page-${pageNum}`);
 
           if (canvasWrapper && pageWrapperEl) {
@@ -158,25 +155,21 @@ export const EditorPage: Page = {
               e.preventDefault();
               pageWrapperEl.classList.add("drop-active");
             });
-
             canvasWrapper.addEventListener("dragleave", (e) => {
               e.preventDefault();
               pageWrapperEl.classList.remove("drop-active");
             });
-
             canvasWrapper.addEventListener("dragover", (e) => {
               e.preventDefault();
               e.dataTransfer!.dropEffect = "copy";
               pageWrapperEl.classList.add("drop-active");
             });
-
             canvasWrapper.addEventListener("drop", (e) => {
               e.preventDefault();
               pageWrapperEl.classList.remove("drop-active");
               handleDrop(e, fCanvas);
             });
           }
-
           fabricPages.set(pageNum, fCanvas);
         }
       }
@@ -195,13 +188,10 @@ export const EditorPage: Page = {
     if (btnSave) {
       btnSave.onclick = async () => {
         if (!file || fabricPages.size === 0) return;
-
         const originalText = btnSave.innerText;
         btnSave.innerText = "Processing...";
         (btnSave as HTMLButtonElement).disabled = true;
-
         await savePdf(file, fabricPages);
-
         btnSave.innerText = originalText;
         (btnSave as HTMLButtonElement).disabled = false;
       };
@@ -224,15 +214,316 @@ export const EditorPage: Page = {
   },
 };
 
+function resetSignatureModal() {
+  activeSignatureTab = "draw";
+  activeSignatureColor = "#000000";
+  activeSignatureFont = "'Caveat', cursive";
+
+  document
+    .querySelectorAll(".tab-btn")
+    .forEach((b) => b.classList.remove("active"));
+  document.querySelector('[data-tab="draw"]')?.classList.add("active");
+
+  document
+    .querySelectorAll(".tab-content")
+    .forEach((c) => c.classList.add("hidden"));
+  document.getElementById("tab-content-draw")?.classList.remove("hidden");
+
+  document
+    .querySelectorAll(".color-btn")
+    .forEach((b) => b.classList.remove("active"));
+  document.querySelector('[data-color="#000000"]')?.classList.add("active");
+  document.getElementById("signature-color-picker")?.classList.remove("hidden");
+
+  document
+    .querySelectorAll(".font-btn")
+    .forEach((b) => b.classList.remove("active"));
+  document
+    .querySelector(`[data-font="${activeSignatureFont}"]`)
+    ?.classList.add("active");
+
+  const typeInput = document.getElementById(
+    "type-signature-input",
+  ) as HTMLInputElement;
+  if (typeInput) typeInput.value = "";
+
+  const imgInput = document.getElementById(
+    "image-signature-input",
+  ) as HTMLInputElement;
+  if (imgInput) imgInput.value = "";
+
+  document.getElementById("image-upload-area")?.classList.remove("hidden");
+  document.getElementById("image-preview-container")?.classList.add("hidden");
+
+  const clearBtn = document.getElementById("btn-modal-clear");
+  if (clearBtn) clearBtn.style.display = "block";
+
+  if (modalPad) {
+    modalPad.clear();
+    modalPad.penColor = "#000000";
+  }
+
+  const typeCanvas = document.getElementById("type-pad") as HTMLCanvasElement;
+  if (typeCanvas) {
+    const ctx = typeCanvas.getContext("2d");
+    ctx?.clearRect(0, 0, typeCanvas.width, typeCanvas.height);
+  }
+}
+
+function renderTextSignature(text: string) {
+  const canvas = document.getElementById("type-pad") as HTMLCanvasElement;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!text) return;
+
+  ctx.save();
+
+  const baseFontSize = 100;
+  const padding = 40;
+  const maxWidth = canvas.width - padding;
+
+  ctx.font = `${baseFontSize}px ${activeSignatureFont}`;
+
+  const textWidth = ctx.measureText(text).width;
+  let finalFontSize = baseFontSize;
+
+  if (textWidth > maxWidth) {
+    const scale = maxWidth / textWidth;
+    finalFontSize = Math.floor(baseFontSize * scale);
+
+    if (finalFontSize < 20) finalFontSize = 20;
+  }
+
+  ctx.font = `${finalFontSize}px ${activeSignatureFont}`;
+  ctx.fillStyle = activeSignatureColor;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const yOffset = canvas.height / 2;
+
+  ctx.fillText(text, canvas.width / 2, yOffset);
+  ctx.restore();
+}
+
+function setupModalLogic() {
+  const modal = document.getElementById("signature-modal");
+  const btnCreate = document.getElementById("btn-create-signature");
+  const btnCancel = document.getElementById("btn-modal-cancel");
+  const btnSave = document.getElementById("btn-modal-save");
+  const btnClear = document.getElementById("btn-modal-clear");
+
+  const padContainer = document.getElementById(
+    "signature-pad-container",
+  ) as HTMLElement;
+
+  if (btnCreate) {
+    btnCreate.onclick = () => {
+      setActiveTool("select");
+      modal?.classList.remove("hidden");
+      resetSignatureModal();
+
+      if (!modalPad && padContainer) {
+        modalPad = new SignaturePad(padContainer);
+      }
+    };
+  }
+
+  const tabs = document.querySelectorAll(".tab-btn");
+  tabs.forEach((tab) => {
+    (tab as HTMLElement).onclick = (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const tabName = target.getAttribute("data-tab") as
+        | "draw"
+        | "type"
+        | "image";
+      activeSignatureTab = tabName;
+
+      tabs.forEach((t) => t.classList.remove("active"));
+      target.classList.add("active");
+
+      document
+        .querySelectorAll(".tab-content")
+        .forEach((content) => content.classList.add("hidden"));
+      document
+        .getElementById(`tab-content-${tabName}`)
+        ?.classList.remove("hidden");
+
+      const colorPicker = document.getElementById("signature-color-picker");
+      const clearBtn = document.getElementById("btn-modal-clear");
+
+      if (tabName === "image") {
+        colorPicker?.classList.add("hidden");
+        if (clearBtn) clearBtn.style.display = "none";
+      } else {
+        colorPicker?.classList.remove("hidden");
+        if (clearBtn) clearBtn.style.display = "block";
+
+        if (tabName === "type") {
+          const input = document.getElementById(
+            "type-signature-input",
+          ) as HTMLInputElement;
+          renderTextSignature(input.value);
+        }
+      }
+    };
+  });
+
+  const colorBtns = document.querySelectorAll(".color-btn");
+  colorBtns.forEach((btn) => {
+    (btn as HTMLElement).onclick = (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const color = target.getAttribute("data-color") || "#000000";
+      activeSignatureColor = color;
+
+      colorBtns.forEach((b) => b.classList.remove("active"));
+      target.classList.add("active");
+
+      if (activeSignatureTab === "draw" && modalPad) {
+        modalPad.recolor(color);
+      } else if (activeSignatureTab === "type") {
+        const input = document.getElementById(
+          "type-signature-input",
+        ) as HTMLInputElement;
+        renderTextSignature(input.value);
+      }
+    };
+  });
+
+  const fontBtns = document.querySelectorAll(".font-btn");
+  fontBtns.forEach((btn) => {
+    (btn as HTMLElement).onclick = (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const font = target.getAttribute("data-font") || "'Caveat', cursive";
+      activeSignatureFont = font;
+
+      fontBtns.forEach((b) => b.classList.remove("active"));
+      target.classList.add("active");
+
+      const input = document.getElementById(
+        "type-signature-input",
+      ) as HTMLInputElement;
+      renderTextSignature(input.value);
+    };
+  });
+
+  const typeInput = document.getElementById(
+    "type-signature-input",
+  ) as HTMLInputElement;
+  if (typeInput) {
+    typeInput.oninput = (e) => {
+      renderTextSignature((e.target as HTMLInputElement).value);
+    };
+  }
+
+  const uploadArea = document.getElementById("image-upload-area");
+  const imageInput = document.getElementById(
+    "image-signature-input",
+  ) as HTMLInputElement;
+  const btnRemoveImg = document.getElementById("btn-remove-image");
+
+  if (uploadArea && imageInput) {
+    uploadArea.onclick = () => imageInput.click();
+
+    imageInput.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (f) => {
+          const result = f.target?.result as string;
+          const imgPreview = document.getElementById(
+            "image-signature-preview",
+          ) as HTMLImageElement;
+
+          if (imgPreview) {
+            imgPreview.src = result;
+            document
+              .getElementById("image-preview-container")
+              ?.classList.remove("hidden");
+            uploadArea.classList.add("hidden");
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+  }
+
+  if (btnRemoveImg) {
+    btnRemoveImg.onclick = () => {
+      imageInput.value = "";
+      document
+        .getElementById("image-preview-container")
+        ?.classList.add("hidden");
+      uploadArea?.classList.remove("hidden");
+    };
+  }
+
+  const closeModal = () => modal?.classList.add("hidden");
+  if (btnCancel) btnCancel.onclick = closeModal;
+
+  if (btnClear) {
+    btnClear.onclick = () => {
+      if (activeSignatureTab === "draw") {
+        modalPad?.clear();
+      } else if (activeSignatureTab === "type") {
+        const input = document.getElementById(
+          "type-signature-input",
+        ) as HTMLInputElement;
+        input.value = "";
+        renderTextSignature("");
+      }
+    };
+  }
+
+  if (btnSave) {
+    btnSave.onclick = () => {
+      let finalDataUrl: string | null = null;
+
+      if (activeSignatureTab === "draw" && modalPad) {
+        if (modalPad.isEmpty()) {
+          alert("Area tanda tangan kosong!");
+          return;
+        }
+        finalDataUrl = modalPad.toDataURL();
+      } else if (activeSignatureTab === "type") {
+        const typeCanvas = document.getElementById(
+          "type-pad",
+        ) as HTMLCanvasElement;
+        const input = document.getElementById(
+          "type-signature-input",
+        ) as HTMLInputElement;
+        if (!input.value.trim()) {
+          alert("Silakan ketik nama Anda.");
+          return;
+        }
+        finalDataUrl = typeCanvas.toDataURL("image/png");
+      } else if (activeSignatureTab === "image") {
+        const imgPreview = document.getElementById(
+          "image-signature-preview",
+        ) as HTMLImageElement;
+        if (!imgPreview.src || imgPreview.src === window.location.href) {
+          alert("Silakan upload gambar tanda tangan.");
+          return;
+        }
+        finalDataUrl = imgPreview.src;
+      }
+
+      if (finalDataUrl) {
+        addDraggableAsset(finalDataUrl);
+        closeModal();
+      }
+    };
+  }
+}
+
 function setActiveTool(tool: "select" | "text" | "checkbox") {
   activeTool = tool;
   updateToolbarVisuals();
-
   fabricPages.forEach((canvas) => {
     canvas.selection = tool === "select";
-
     updateCanvasCursor(canvas);
-
     canvas.requestRenderAll();
   });
 }
@@ -240,10 +531,8 @@ function setActiveTool(tool: "select" | "text" | "checkbox") {
 function updateToolbarVisuals() {
   const btnText = document.getElementById("btn-add-text");
   const btnCheck = document.getElementById("btn-add-checkbox");
-
   btnText?.classList.remove("active");
   btnCheck?.classList.remove("active");
-
   if (activeTool === "text") btnText?.classList.add("active");
   if (activeTool === "checkbox") btnCheck?.classList.add("active");
 }
@@ -262,10 +551,7 @@ function updateCanvasCursor(canvas: fabric.Canvas) {
 }
 
 function handleCanvasClick(canvas: fabric.Canvas, opt: fabric.IEvent) {
-  if (opt.target) {
-    return;
-  }
-
+  if (opt.target) return;
   if (activeTool === "select") return;
 
   const pointer = canvas.getPointer(opt.e);
@@ -292,14 +578,11 @@ function handleCanvasClick(canvas: fabric.Canvas, opt: fabric.IEvent) {
       top: pointer.y,
       originX: "center",
       originY: "center",
-
       fill: "black",
       stroke: null,
-
       scaleX: 1.5,
       scaleY: 1.5,
       objectCaching: false,
-
       ...({ isCheckbox: true, checkboxType: "check" } as any),
     });
 
@@ -321,12 +604,10 @@ function handleDrop(e: DragEvent, canvas: fabric.Canvas) {
 
   fabric.Image.fromURL(imgSrc, (img) => {
     const targetWidth = 300;
-
     let scale = 1;
     if (img.width && img.width > targetWidth) {
       scale = targetWidth / img.width;
     }
-
     img.set({
       left: x,
       top: y,
@@ -338,7 +619,6 @@ function handleDrop(e: DragEvent, canvas: fabric.Canvas) {
       cornerColor: "#2563eb",
       transparentCorners: false,
     });
-
     canvas.add(img);
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
@@ -375,7 +655,6 @@ function addDraggableAsset(imgSrc: string) {
 
     btnDel.onclick = () => {
       wrapper.remove();
-
       if (container.children.length === 0) {
         container.innerHTML = `<p class="empty-hint">Belum ada aset. Buat tanda tangan atau upload gambar dulu.
 </p>`;
@@ -385,39 +664,6 @@ function addDraggableAsset(imgSrc: string) {
     wrapper.appendChild(img);
     wrapper.appendChild(btnDel);
     container.appendChild(wrapper);
-  }
-}
-
-function setupModalLogic() {
-  const modal = document.getElementById("signature-modal");
-  const btnCreate = document.getElementById("btn-create-signature");
-  const btnCancel = document.getElementById("btn-modal-cancel");
-  const btnSave = document.getElementById("btn-modal-save");
-  const btnClear = document.getElementById("btn-modal-clear");
-  const padCanvas = document.getElementById("modal-pad") as HTMLCanvasElement;
-
-  if (btnCreate) {
-    btnCreate.onclick = () => {
-      setActiveTool("select");
-      modal?.classList.remove("hidden");
-      if (!modalPad && padCanvas) {
-        modalPad = new SignaturePad(padCanvas);
-      }
-      modalPad?.clear();
-    };
-  }
-
-  const closeModal = () => modal?.classList.add("hidden");
-  if (btnCancel) btnCancel.onclick = closeModal;
-  if (btnClear) btnClear.onclick = () => modalPad?.clear();
-
-  if (btnSave) {
-    btnSave.onclick = () => {
-      if (!modalPad) return;
-      const signatureImage = modalPad.canvas.toDataURL("image/png");
-      addDraggableAsset(signatureImage);
-      closeModal();
-    };
   }
 }
 
@@ -458,8 +704,6 @@ function setupToolbarLogic() {
         const data = f.target?.result as string;
         addDraggableAsset(data);
         inputStamp.value = "";
-        // optional: bisa langsung taruh signature di canvas setelah user click save
-        // optional: we can put the signature in canvas once the user click save
       };
       reader.readAsDataURL(file);
     };
