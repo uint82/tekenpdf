@@ -19,6 +19,9 @@ let activeSignatureTab: "draw" | "type" | "image" = "draw";
 let activeSignatureColor: string = "#000000";
 let activeSignatureFont: string = "'Caveat', cursive";
 
+let activeObject: fabric.Object | null = null;
+let activeCanvasId: number | null = null;
+
 function getCurrentVisualZoom() {
   return window.visualViewport ? window.visualViewport.scale : 1;
 }
@@ -67,7 +70,7 @@ export const EditorPage: Page = {
         const pageWrapper = document.createElement("div");
         pageWrapper.className = "page-wrapper";
         pageWrapper.id = `page-${pageNum}`;
-        pageWrapper.dataset.pageNum = pageNum.toString(); // ID untuk Observer
+        pageWrapper.dataset.pageNum = pageNum.toString();
         pageWrapper.style.position = "relative";
         pageWrapper.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1)";
         pageWrapper.style.minHeight = "800px";
@@ -95,6 +98,7 @@ export const EditorPage: Page = {
     setupModalLogic();
     setupToolbarLogic();
     setupKeyboardShortcuts();
+    setupFloatingMenuLogic();
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", handleVisualZoom);
@@ -123,6 +127,7 @@ export const EditorPage: Page = {
     const view = document.getElementById("editor-view");
     document.body.classList.remove("editor-mode");
     view?.classList.add("hidden");
+    hideFloatingMenu();
 
     fabricPages.forEach((canvas) => canvas.dispose());
     fabricPages.clear();
@@ -178,6 +183,19 @@ async function setupInitialLayout(
   };
 
   fCanvas.on("mouse:down", (opt) => handleCanvasClick(fCanvas, opt));
+  fCanvas.on("selection:created", (e) => handleSelection(e, pageNum));
+  fCanvas.on("selection:updated", (e) => handleSelection(e, pageNum));
+
+  fCanvas.on("object:moving", (e) => updateMenuPosition(e.target));
+  fCanvas.on("object:scaling", (e) => updateMenuPosition(e.target));
+  fCanvas.on("object:rotating", (e) => updateMenuPosition(e.target));
+  fCanvas.on("object:modified", (e) => updateMenuPosition(e.target));
+
+  fCanvas.on("selection:cleared", () => {
+    if (activeCanvasId === pageNum) {
+      hideFloatingMenu();
+    }
+  });
   fCanvas.on("mouse:over", () => updateCanvasCursor(fCanvas));
 
   fCanvas.on("mouse:dblclick", (opt) => {
@@ -213,6 +231,168 @@ async function setupInitialLayout(
   }
 
   fabricPages.set(pageNum, fCanvas);
+}
+
+function handleSelection(e: fabric.IEvent, pageNum: number) {
+  const target = e.selected?.[0] || e.target;
+  if (!target) return;
+
+  fabricPages.forEach((canvas, pId) => {
+    if (pId !== pageNum) {
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+    }
+  });
+
+  activeObject = target;
+  activeCanvasId = pageNum;
+
+  const menu = document.getElementById("floating-context-menu");
+  const colorPicker = document.getElementById("ctx-color-picker");
+  const btnColor = document.getElementById("ctx-color");
+
+  if (menu) {
+    menu.classList.remove("hidden");
+    colorPicker?.classList.add("hidden");
+
+    const isImage = target.type === "image";
+    if (btnColor) {
+      (btnColor as HTMLButtonElement).style.display = isImage ? "none" : "flex";
+    }
+
+    updateMenuPosition(target);
+  }
+}
+
+function updateMenuPosition(target: fabric.Object | undefined) {
+  if (!target || !activeCanvasId) return;
+
+  const menu = document.getElementById("floating-context-menu");
+  if (!menu) return;
+
+  const bound = target.getBoundingRect(true, true);
+
+  const pageWrapper = document.getElementById(`page-${activeCanvasId}`);
+  if (!pageWrapper) return;
+
+  const wrapperRect = pageWrapper.getBoundingClientRect();
+  const scrollArea = document.getElementById("canvas-scroll-area");
+  const scrollAreaRect = scrollArea?.getBoundingClientRect() || {
+    top: 0,
+    left: 0,
+  };
+
+  const absoluteTop =
+    wrapperRect.top -
+    scrollAreaRect.top +
+    bound.top +
+    bound.height +
+    scrollArea!.scrollTop +
+    10;
+
+  const absoluteLeft =
+    wrapperRect.left -
+    scrollAreaRect.left +
+    bound.left +
+    bound.width / 2 +
+    scrollArea!.scrollLeft;
+
+  menu.style.top = `${absoluteTop}px`;
+  menu.style.left = `${absoluteLeft}px`;
+}
+
+function hideFloatingMenu() {
+  const menu = document.getElementById("floating-context-menu");
+  if (menu) menu.classList.add("hidden");
+  activeObject = null;
+  activeCanvasId = null;
+}
+
+function setupFloatingMenuLogic() {
+  document.getElementById("ctx-delete")?.addEventListener("click", () => {
+    deleteActiveObject();
+    hideFloatingMenu();
+  });
+
+  document.getElementById("ctx-color")?.addEventListener("click", () => {
+    const picker = document.getElementById("ctx-color-picker");
+    picker?.classList.toggle("hidden");
+    if (activeObject) updateMenuPosition(activeObject);
+  });
+
+  document.querySelectorAll(".color-dot").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const color = (e.target as HTMLElement).dataset.color;
+      if (activeObject && color) {
+        if (activeObject instanceof fabric.Group) {
+          activeObject.getObjects().forEach((o) => o.set({ fill: color }));
+        } else {
+          activeObject.set({ fill: color });
+          if (activeObject.stroke) activeObject.set({ stroke: color });
+        }
+
+        const canvas = fabricPages.get(activeCanvasId!);
+        canvas?.requestRenderAll();
+
+        document.getElementById("ctx-color-picker")?.classList.add("hidden");
+      }
+    });
+  });
+
+  document.getElementById("ctx-duplicate")?.addEventListener("click", () => {
+    if (!activeObject || !activeCanvasId) return;
+    const canvas = fabricPages.get(activeCanvasId);
+
+    activeObject.clone((cloned: fabric.Object) => {
+      canvas?.discardActiveObject();
+
+      cloned.set({
+        left: cloned.left! + 20,
+        top: cloned.top! + 20,
+        evented: true,
+      });
+
+      if (cloned instanceof fabric.Group) {
+        cloned.addWithUpdate();
+      }
+
+      applyObjectControls(cloned);
+
+      canvas?.add(cloned);
+      canvas?.setActiveObject(cloned);
+      canvas?.requestRenderAll();
+
+      handleSelection({ target: cloned } as any, activeCanvasId!);
+    });
+  });
+
+  document
+    .getElementById("ctx-duplicate-all")
+    ?.addEventListener("click", () => {
+      if (!activeObject || !activeCanvasId) return;
+
+      const originalObj = activeObject;
+      const originalPageId = activeCanvasId;
+
+      fabricPages.forEach((canvas, pageNum) => {
+        if (pageNum === originalPageId) return;
+
+        originalObj.clone((cloned: fabric.Object) => {
+          cloned.set({
+            left: originalObj.left,
+            top: originalObj.top,
+            evented: true,
+          });
+
+          applyObjectControls(cloned);
+
+          canvas.add(cloned);
+          canvas.requestRenderAll();
+        });
+      });
+
+      alert("Objek berhasil diduplikasi ke semua halaman!");
+    });
 }
 
 function setupIntersectionObserver() {
@@ -668,6 +848,7 @@ function handleCanvasClick(canvas: fabric.Canvas, opt: fabric.IEvent) {
       fill: "#000000",
       cursorColor: "#2563eb",
     });
+    applyObjectControls(text);
     canvas.add(text);
     canvas.setActiveObject(text);
     text.enterEditing();
@@ -688,6 +869,8 @@ function handleCanvasClick(canvas: fabric.Canvas, opt: fabric.IEvent) {
       objectCaching: false,
       ...({ isCheckbox: true, checkboxType: "check" } as any),
     });
+
+    applyObjectControls(checkbox);
 
     canvas.add(checkbox);
     canvas.requestRenderAll();
@@ -722,6 +905,7 @@ function handleDrop(e: DragEvent, canvas: fabric.Canvas) {
       cornerColor: "#2563eb",
       transparentCorners: false,
     });
+    applyObjectControls(img);
     canvas.add(img);
     canvas.setActiveObject(img);
     canvas.requestRenderAll();
@@ -846,4 +1030,20 @@ function handleKeydown(e: KeyboardEvent) {
       deleteActiveObject();
     }
   }
+}
+
+function applyObjectControls(obj: fabric.Object) {
+  obj.set({
+    transparentCorners: false,
+    cornerColor: "#2563eb",
+    cornerStrokeColor: "#2563eb",
+    borderColor: "#2563eb",
+    cornerSize: 12,
+    padding: 10,
+    cornerStyle: "circle",
+    strokeUniform: true,
+    borderScaleFactor: 2,
+  });
+
+  obj.setControlsVisibility({ mtr: true });
 }
