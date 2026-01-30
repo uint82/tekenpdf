@@ -9,6 +9,9 @@ import type { Page } from "../utils/router";
 
 const fabricPages = new Map<number, fabric.Canvas>();
 let pdfDoc: any = null;
+let pageObserver: IntersectionObserver | null = null;
+let resizeTimeout: any = null;
+
 let modalPad: SignaturePad | null = null;
 let activeTool: "select" | "text" | "checkbox" = "select";
 
@@ -16,11 +19,15 @@ let activeSignatureTab: "draw" | "type" | "image" = "draw";
 let activeSignatureColor: string = "#000000";
 let activeSignatureFont: string = "'Caveat', cursive";
 
+function getCurrentVisualZoom() {
+  return window.visualViewport ? window.visualViewport.scale : 1;
+}
+
 export const EditorPage: Page = {
   async mount() {
     document.body.classList.add("editor-mode");
     setupThemeButton("theme-toggle-sidebar");
-    console.log("Mounting Editor (Click-to-Place Mode)...");
+    console.log("Mounting Editor (Lazy Load & Pinch Zoom Support)...");
 
     activeTool = "select";
     updateToolbarVisuals();
@@ -54,15 +61,21 @@ export const EditorPage: Page = {
       pdfDoc = await loadPdfDocument(file);
       console.log(`PDF Loaded: ${pdfDoc.numPages} pages.`);
 
+      setupIntersectionObserver();
+
       for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
         const pageWrapper = document.createElement("div");
         pageWrapper.className = "page-wrapper";
         pageWrapper.id = `page-${pageNum}`;
+        pageWrapper.dataset.pageNum = pageNum.toString(); // ID untuk Observer
         pageWrapper.style.position = "relative";
         pageWrapper.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.1)";
+        pageWrapper.style.minHeight = "800px";
 
         const pdfCanvas = document.createElement("canvas");
         pdfCanvas.className = "pdf-layer";
+        pdfCanvas.width = 0;
+        pdfCanvas.height = 0;
 
         const fabricCanvasEl = document.createElement("canvas");
         fabricCanvasEl.id = `fabric-page-${pageNum}`;
@@ -71,107 +84,9 @@ export const EditorPage: Page = {
         pageWrapper.appendChild(fabricCanvasEl);
         pagesContainer.appendChild(pageWrapper);
 
-        const dims = await renderPageToCanvas(pdfDoc, pageNum, pdfCanvas);
+        await setupInitialLayout(pdfDoc, pageNum, fabricCanvasEl);
 
-        if (dims) {
-          const fCanvas = new fabric.Canvas(fabricCanvasEl.id, {
-            width: parseInt(dims.styleWidth, 10),
-            height: parseInt(dims.styleHeight, 10),
-            selection: true,
-            enableRetinaScaling: true,
-          });
-
-          (fCanvas as any).pdfInfo = {
-            precisionScale: dims.precisionScale,
-            viewportWidth: dims.viewportWidth,
-            pageNumber: pageNum,
-          };
-
-          fCanvas.on("mouse:down", (opt) => {
-            handleCanvasClick(fCanvas, opt);
-          });
-
-          fCanvas.on("mouse:over", () => {
-            updateCanvasCursor(fCanvas);
-          });
-
-          fCanvas.on("mouse:dblclick", (opt) => {
-            const target = opt.target;
-            if (
-              target &&
-              (target as any).isCheckbox &&
-              target instanceof fabric.Path
-            ) {
-              const t = target as any;
-              const centerX = target.left || 0;
-              const centerY = target.top || 0;
-              const currentScaleX = target.scaleX || 1.5;
-              const currentScaleY = target.scaleY || 1.5;
-              const currentAngle = target.angle || 0;
-              const currentType = t.checkboxType;
-
-              let newPathString = "";
-              let newFill = "";
-              let newType = "";
-
-              if (currentType === "check") {
-                newPathString =
-                  "M13.08 5.44a0.94 0.75 0 0 0 -1.33 0L8 8.44 4.26 5.44a0.94 0.75 0 1 0 -1.33 1.06L6.68 9.5l-3.75 3.01a0.94 0.75 0 0 0 1.33 1.06L8 10.56l3.74 3.01a0.94 0.75 0 0 0 1.33 -1.06L9.33 9.5l3.74 -3a0.94 0.75 0 0 0 0 -1.06z";
-                newFill = "#ef4444";
-                newType = "cross";
-              } else {
-                newPathString =
-                  "M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z";
-                newFill = "black";
-                newType = "check";
-              }
-
-              fCanvas.remove(target);
-              const newCheckbox = new fabric.Path(newPathString, {
-                left: centerX,
-                top: centerY,
-                originX: "center",
-                originY: "center",
-                fill: newFill,
-                stroke: null,
-                scaleX: currentScaleX,
-                scaleY: currentScaleY,
-                angle: currentAngle,
-                objectCaching: false,
-                ...({ isCheckbox: true, checkboxType: newType } as any),
-              });
-              fCanvas.add(newCheckbox);
-              fCanvas.setActiveObject(newCheckbox);
-              fCanvas.requestRenderAll();
-            }
-          });
-
-          const upperCanvasEl = fCanvas.getElement();
-          const canvasWrapper = upperCanvasEl.parentElement;
-          const pageWrapperEl = document.getElementById(`page-${pageNum}`);
-
-          if (canvasWrapper && pageWrapperEl) {
-            canvasWrapper.addEventListener("dragenter", (e) => {
-              e.preventDefault();
-              pageWrapperEl.classList.add("drop-active");
-            });
-            canvasWrapper.addEventListener("dragleave", (e) => {
-              e.preventDefault();
-              pageWrapperEl.classList.remove("drop-active");
-            });
-            canvasWrapper.addEventListener("dragover", (e) => {
-              e.preventDefault();
-              e.dataTransfer!.dropEffect = "copy";
-              pageWrapperEl.classList.add("drop-active");
-            });
-            canvasWrapper.addEventListener("drop", (e) => {
-              e.preventDefault();
-              pageWrapperEl.classList.remove("drop-active");
-              handleDrop(e, fCanvas);
-            });
-          }
-          fabricPages.set(pageNum, fCanvas);
-        }
+        if (pageObserver) pageObserver.observe(pageWrapper);
       }
     } catch (err) {
       console.error("Error mounting pages:", err);
@@ -180,6 +95,12 @@ export const EditorPage: Page = {
     setupModalLogic();
     setupToolbarLogic();
     setupKeyboardShortcuts();
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleVisualZoom);
+      window.visualViewport.addEventListener("scroll", handleVisualZoom);
+    }
+    window.addEventListener("resize", handleVisualZoom);
 
     const btnBack = document.getElementById("back-btn");
     if (btnBack) btnBack.onclick = () => router.navigate("/");
@@ -210,9 +131,197 @@ export const EditorPage: Page = {
       modalPad.clear();
       modalPad = null;
     }
+
+    if (pageObserver) {
+      pageObserver.disconnect();
+      pageObserver = null;
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener("resize", handleVisualZoom);
+      window.visualViewport.removeEventListener("scroll", handleVisualZoom);
+    }
+    window.removeEventListener("resize", handleVisualZoom);
     window.removeEventListener("keydown", handleKeydown);
   },
 };
+
+async function setupInitialLayout(
+  doc: any,
+  pageNum: number,
+  fabricCanvasEl: HTMLCanvasElement,
+) {
+  const page = await doc.getPage(pageNum);
+
+  const container = document.getElementById("canvas-scroll-area");
+  const containerWidth = container?.clientWidth || window.innerWidth;
+  const targetWidth = Math.min(containerWidth - 80, 892);
+
+  const unscaledViewport = page.getViewport({ scale: 1 });
+  const scaleFactor = targetWidth / unscaledViewport.width;
+  const viewport = page.getViewport({ scale: scaleFactor });
+
+  const wrapper = document.getElementById(`page-${pageNum}`);
+  if (wrapper) wrapper.style.minHeight = `${viewport.height}px`;
+
+  const fCanvas = new fabric.Canvas(fabricCanvasEl.id, {
+    width: viewport.width,
+    height: viewport.height,
+    selection: true,
+    enableRetinaScaling: true,
+  });
+
+  (fCanvas as any).pdfInfo = {
+    precisionScale: scaleFactor,
+    viewportWidth: viewport.width,
+    pageNumber: pageNum,
+  };
+
+  fCanvas.on("mouse:down", (opt) => handleCanvasClick(fCanvas, opt));
+  fCanvas.on("mouse:over", () => updateCanvasCursor(fCanvas));
+
+  fCanvas.on("mouse:dblclick", (opt) => {
+    const target = opt.target;
+    if (target && (target as any).isCheckbox && target instanceof fabric.Path) {
+      toggleCheckbox(fCanvas, target as fabric.Path);
+    }
+  });
+
+  const upperCanvasEl = fCanvas.getElement();
+  const canvasWrapper = upperCanvasEl.parentElement;
+  const pageWrapperEl = document.getElementById(`page-${pageNum}`);
+
+  if (canvasWrapper && pageWrapperEl) {
+    canvasWrapper.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      pageWrapperEl.classList.add("drop-active");
+    });
+    canvasWrapper.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      pageWrapperEl.classList.remove("drop-active");
+    });
+    canvasWrapper.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = "copy";
+      pageWrapperEl.classList.add("drop-active");
+    });
+    canvasWrapper.addEventListener("drop", (e) => {
+      e.preventDefault();
+      pageWrapperEl.classList.remove("drop-active");
+      handleDrop(e, fCanvas);
+    });
+  }
+
+  fabricPages.set(pageNum, fCanvas);
+}
+
+function setupIntersectionObserver() {
+  const options = {
+    root: document.getElementById("canvas-scroll-area"),
+    rootMargin: "400px",
+    threshold: 0.01,
+  };
+
+  pageObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const pageNum = parseInt(
+        (entry.target as HTMLElement).dataset.pageNum || "0",
+      );
+      if (!pageNum || !pdfDoc) return;
+
+      const pdfCanvas = entry.target.querySelector(
+        ".pdf-layer",
+      ) as HTMLCanvasElement;
+
+      if (entry.isIntersecting) {
+        const currentZoom = getCurrentVisualZoom();
+        requestAnimationFrame(() => {
+          renderPageToCanvas(pdfDoc, pageNum, pdfCanvas, currentZoom);
+        });
+      }
+    });
+  }, options);
+}
+
+function handleVisualZoom() {
+  clearTimeout(resizeTimeout);
+
+  resizeTimeout = setTimeout(() => {
+    const currentZoom = getCurrentVisualZoom();
+    console.log("Zoom settled at:", currentZoom);
+
+    const visiblePages: number[] = [];
+    const container = document.getElementById("canvas-scroll-area");
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+
+    fabricPages.forEach((_, pageNum) => {
+      const el = document.getElementById(`page-${pageNum}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (
+          rect.top < containerRect.bottom &&
+          rect.bottom > containerRect.top
+        ) {
+          visiblePages.push(pageNum);
+        }
+      }
+    });
+
+    visiblePages.forEach((pageNum) => {
+      const pdfCanvas = document.querySelector(
+        `#page-${pageNum} .pdf-layer`,
+      ) as HTMLCanvasElement;
+      if (pdfCanvas && pdfDoc) {
+        renderPageToCanvas(pdfDoc, pageNum, pdfCanvas, currentZoom);
+      }
+    });
+  }, 400);
+}
+
+function toggleCheckbox(canvas: fabric.Canvas, target: fabric.Path) {
+  const t = target as any;
+  const centerX = target.left || 0;
+  const centerY = target.top || 0;
+  const currentScaleX = target.scaleX || 1.5;
+  const currentScaleY = target.scaleY || 1.5;
+  const currentAngle = target.angle || 0;
+  const currentType = t.checkboxType;
+
+  let newPathString = "";
+  let newFill = "";
+  let newType = "";
+
+  if (currentType === "check") {
+    newPathString =
+      "M13.08 5.44a0.94 0.75 0 0 0 -1.33 0L8 8.44 4.26 5.44a0.94 0.75 0 1 0 -1.33 1.06L6.68 9.5l-3.75 3.01a0.94 0.75 0 0 0 1.33 1.06L8 10.56l3.74 3.01a0.94 0.75 0 0 0 1.33 -1.06L9.33 9.5l3.74 -3a0.94 0.75 0 0 0 0 -1.06z";
+    newFill = "#ef4444";
+    newType = "cross";
+  } else {
+    newPathString =
+      "M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z";
+    newFill = "black";
+    newType = "check";
+  }
+
+  canvas.remove(target);
+  const newCheckbox = new fabric.Path(newPathString, {
+    left: centerX,
+    top: centerY,
+    originX: "center",
+    originY: "center",
+    fill: newFill,
+    stroke: null,
+    scaleX: currentScaleX,
+    scaleY: currentScaleY,
+    angle: currentAngle,
+    objectCaching: false,
+    ...({ isCheckbox: true, checkboxType: newType } as any),
+  });
+  canvas.add(newCheckbox);
+  canvas.setActiveObject(newCheckbox);
+  canvas.requestRenderAll();
+}
 
 function resetSignatureModal() {
   activeSignatureTab = "draw";
@@ -280,20 +389,17 @@ function renderTextSignature(text: string) {
   if (!text) return;
 
   ctx.save();
-
   const baseFontSize = 100;
   const padding = 40;
   const maxWidth = canvas.width - padding;
 
   ctx.font = `${baseFontSize}px ${activeSignatureFont}`;
-
   const textWidth = ctx.measureText(text).width;
   let finalFontSize = baseFontSize;
 
   if (textWidth > maxWidth) {
     const scale = maxWidth / textWidth;
     finalFontSize = Math.floor(baseFontSize * scale);
-
     if (finalFontSize < 20) finalFontSize = 20;
   }
 
@@ -303,7 +409,6 @@ function renderTextSignature(text: string) {
   ctx.textBaseline = "middle";
 
   const yOffset = canvas.height / 2;
-
   ctx.fillText(text, canvas.width / 2, yOffset);
   ctx.restore();
 }
@@ -360,7 +465,6 @@ function setupModalLogic() {
       } else {
         colorPicker?.classList.remove("hidden");
         if (clearBtn) clearBtn.style.display = "block";
-
         if (tabName === "type") {
           const input = document.getElementById(
             "type-signature-input",
@@ -436,7 +540,6 @@ function setupModalLogic() {
           const imgPreview = document.getElementById(
             "image-signature-preview",
           ) as HTMLImageElement;
-
           if (imgPreview) {
             imgPreview.src = result;
             document
@@ -656,8 +759,7 @@ function addDraggableAsset(imgSrc: string) {
     btnDel.onclick = () => {
       wrapper.remove();
       if (container.children.length === 0) {
-        container.innerHTML = `<p class="empty-hint">Belum ada aset. Buat tanda tangan atau upload gambar dulu.
-</p>`;
+        container.innerHTML = `<p class="empty-hint">Belum ada aset. Buat tanda tangan atau upload gambar dulu.</p>`;
       }
     };
 
