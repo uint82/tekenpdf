@@ -10,16 +10,16 @@ const cMapUrl = `${cdnBase}/cmaps/`;
 
 (pdfjsLib as any).GlobalWorkerOptions.standardFontDataUrl = fontUrl;
 
+const renderTasks = new Map<number, pdfjsLib.RenderTask>();
+
 export async function loadPdfDocument(file: File) {
   const arrayBuffer = await file.arrayBuffer();
-
   const loadingTask = pdfjsLib.getDocument({
     data: arrayBuffer,
     cMapUrl: cMapUrl,
     cMapPacked: true,
     standardFontDataUrl: fontUrl,
   });
-
   return await loadingTask.promise;
 }
 
@@ -27,8 +27,14 @@ export async function renderPageToCanvas(
   pdfDoc: pdfjsLib.PDFDocumentProxy,
   pageNumber: number,
   canvas: HTMLCanvasElement,
+  currentZoomScale: number = 1,
 ) {
   try {
+    if (renderTasks.has(pageNumber)) {
+      renderTasks.get(pageNumber)?.cancel();
+      renderTasks.delete(pageNumber);
+    }
+
     const page = await pdfDoc.getPage(pageNumber);
 
     const container = document.getElementById("canvas-scroll-area");
@@ -36,43 +42,51 @@ export async function renderPageToCanvas(
     const targetWidth = Math.min(containerWidth - 80, 892);
 
     const unscaledViewport = page.getViewport({ scale: 1 });
-    const targetScale = targetWidth / unscaledViewport.width;
-    const viewport = page.getViewport({ scale: targetScale });
+    const cssScaleFactor = targetWidth / unscaledViewport.width;
+    const cssViewport = page.getViewport({ scale: cssScaleFactor });
 
-    const outputScale = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(viewport.width * outputScale);
-    canvas.height = Math.floor(viewport.height * outputScale);
+    const pixelRatio = window.devicePixelRatio || 1;
+    let totalScale = cssScaleFactor * pixelRatio * currentZoomScale;
 
-    const styleWidthInt = Math.floor(viewport.width);
-    const styleHeightInt = Math.floor(viewport.height);
+    const MINIMUM_QUALITY = 3.0;
+    totalScale = Math.max(totalScale, MINIMUM_QUALITY);
 
-    canvas.style.width = `${styleWidthInt}px`;
-    canvas.style.height = `${styleHeightInt}px`;
+    const MAX_SAFE_SCALE = 6.0;
+    const safeScale = Math.min(totalScale, MAX_SAFE_SCALE);
+
+    canvas.width = Math.floor(unscaledViewport.width * safeScale);
+    canvas.height = Math.floor(unscaledViewport.height * safeScale);
+
+    canvas.style.width = `${Math.floor(cssViewport.width)}px`;
+    canvas.style.height = `${Math.floor(cssViewport.height)}px`;
 
     const context = canvas.getContext("2d");
     if (!context) return null;
 
-    context.scale(outputScale, outputScale);
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.scale(safeScale, safeScale);
 
-    await page.render({
+    const renderTask = page.render({
       canvasContext: context,
-      viewport: viewport,
-    } as any).promise;
+      viewport: unscaledViewport,
+    } as any);
 
-    const finalPrecisionScale = styleWidthInt / unscaledViewport.width;
+    renderTasks.set(pageNumber, renderTask);
+    await renderTask.promise;
+    renderTasks.delete(pageNumber);
 
     return {
       width: canvas.width,
       height: canvas.height,
       styleWidth: canvas.style.width,
       styleHeight: canvas.style.height,
-
-      precisionScale: finalPrecisionScale,
-      viewportWidth: viewport.width,
-      viewportHeight: viewport.height,
+      precisionScale: cssScaleFactor,
+      viewportWidth: cssViewport.width,
     };
-  } catch (error) {
-    console.error(`Error render page ${pageNumber}:`, error);
+  } catch (error: any) {
+    if (error.name !== "RenderingCancelledException") {
+      console.error(`Error render page ${pageNumber}:`, error);
+    }
     return null;
   }
 }
