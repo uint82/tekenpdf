@@ -16,6 +16,41 @@ export const HomePage: Page = {
       };
     }
 
+    const btnDemo = document.getElementById(
+      "btn-try-demo",
+    ) as HTMLButtonElement;
+    if (btnDemo) {
+      btnDemo.disabled = false;
+      btnDemo.innerHTML =
+        '<i class="fa-regular fa-file-pdf"></i> Coba Pakai File Demo';
+
+      btnDemo.onclick = async () => {
+        btnDemo.innerHTML =
+          '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
+        btnDemo.disabled = true;
+
+        try {
+          const response = await fetch("/demo/demo.pdf");
+          if (!response.ok) throw new Error("Gagal memuat file demo");
+
+          const blob = await response.blob();
+          const file = new File([blob], "Demo_Document.pdf", {
+            type: "application/pdf",
+            lastModified: new Date().getTime(),
+          });
+
+          handleFile(file);
+        } catch (error) {
+          console.error(error);
+          alert("Gagal memuat demo.");
+
+          btnDemo.disabled = false;
+          btnDemo.innerHTML =
+            '<i class="fa-regular fa-file-pdf"></i> Coba Pakai File Demo';
+        }
+      };
+    }
+
     const dropZone = document.getElementById("drop-zone");
     if (dropZone) {
       ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
@@ -61,8 +96,6 @@ export const HomePage: Page = {
 
     const input = document.getElementById("pdf-upload") as HTMLInputElement;
     if (input) input.value = "";
-
-    // opsional: remove event listeners jika perlu memory management
   },
 };
 
