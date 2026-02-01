@@ -5,6 +5,7 @@ import { loadPdfDocument, renderPageToCanvas } from "../utils/pdf-render";
 import { savePdf } from "../utils/pdf-save";
 import { SignaturePad } from "../utils/drawing";
 import { setupThemeButton } from "../utils/theme";
+import { t } from "../utils/i18n";
 import type { Page } from "../utils/router";
 
 const fabricPages = new Map<number, fabric.Canvas>();
@@ -113,10 +114,15 @@ export const EditorPage: Page = {
     if (btnSave) {
       btnSave.onclick = async () => {
         if (!file || fabricPages.size === 0) return;
-        const originalText = btnSave.innerText;
-        btnSave.innerText = "Processing...";
+
+        const originalText = t("editor.download_btn");
+
+        btnSave.innerText = t("editor.download_process");
+
         (btnSave as HTMLButtonElement).disabled = true;
+
         await savePdf(file, fabricPages);
+
         btnSave.innerText = originalText;
         (btnSave as HTMLButtonElement).disabled = false;
       };
@@ -534,7 +540,10 @@ function resetSignatureModal() {
   const typeInput = document.getElementById(
     "type-signature-input",
   ) as HTMLInputElement;
-  if (typeInput) typeInput.value = "";
+  if (typeInput) {
+    typeInput.value = "";
+    typeInput.placeholder = t("modal.type_placeholder");
+  }
 
   const imgInput = document.getElementById(
     "image-signature-input",
