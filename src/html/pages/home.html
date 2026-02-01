@@ -1,25 +1,24 @@
 <section id="home-view" class="page">
   <h1>Tekenpdf <i class="fa-solid fa-signature"></i></h1>
-  <p style="margin-bottom: 20px; color: var(--text-light)">
-    Tanda tangan PDF aman, gratis, dan tanpa upload server.
-  </p>
+
+  <p style="margin-bottom: 20px; color: var(--text-light)" data-i18n="app.subtitle"></p>
 
   <div id="drop-zone" class="upload-container">
-    <h3>Upload PDF kamu disini</h3>
-    <p>atau</p>
+    <h3 data-i18n="home.upload_title">Upload PDF kamu disini</h3>
+    <p data-i18n="home.or"></p>
 
-    <label for="pdf-upload" class="btn-primary" style="display: inline-block; margin-top: 10px; cursor: pointer">
-      Pilih File
+    <label for="pdf-upload" class="btn-primary" style="display: inline-block; margin-top: 10px; cursor: pointer"
+      data-i18n="home.choose_file">
     </label>
     <input type="file" id="pdf-upload" accept="application/pdf" style="display: none" />
 
-    <p class="hint">Maksimal 200MB dan 400 lembar (Client-side only)</p>
+    <p class="hint" data-i18n="home.hint"></p>
   </div>
 
   <div class="demo-section">
-    <p>Belum punya file?</p>
-    <button id="btn-try-demo" class="btn-secondary">
-      <i class="fa-regular fa-file-pdf"></i> Coba Pakai File Demo
+    <p data-i18n="home.no_file"></p>
+    <button id="btn-try-demo" class="btn-secondary" data-i18n="home.demo_btn">
+      <i class="fa-regular fa-file-pdf"></i>
     </button>
   </div>
 </section>
