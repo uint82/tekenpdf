@@ -3,29 +3,7 @@
     <main id="canvas-scroll-area">
       <div id="pages-container"></div>
 
-      <div id="floating-context-menu" class="floating-menu hidden">
-        <div class="menu-actions">
-          <button id="ctx-color" class="ctx-btn" title="Ganti Warna (Khusus Tanda Tangan)">
-            <i class="fa-solid fa-palette"></i>
-          </button>
-          <button id="ctx-duplicate" class="ctx-btn" title="Duplikasi">
-            <i class="fa-regular fa-clone"></i>
-          </button>
-          <button id="ctx-duplicate-all" class="ctx-btn" title="Duplikasi ke Semua Halaman">
-            <i class="fa-solid fa-layer-group"></i>
-          </button>
-          <div class="ctx-divider"></div>
-          <button id="ctx-delete" class="ctx-btn delete" title="Hapus">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </div>
-
-        <div id="ctx-color-picker" class="color-options hidden">
-          <button class="color-dot" data-color="#000000" style="background: #000"></button>
-          <button class="color-dot" data-color="#0000FF" style="background: #0000ff"></button>
-          <button class="color-dot" data-color="#FF0000" style="background: #ff0000"></button>
-        </div>
-      </div>
+      <div id="floating-context-menu" class="floating-menu hidden"></div>
     </main>
 
     <aside class="editor-sidebar">
@@ -43,34 +21,32 @@
 
       <div class="file-info-card">
         <i class="fa-regular fa-file-pdf"></i>
-        <span id="filename-display">Loading...</span>
+        <span id="filename-display" data-i18n="editor.loading"></span>
       </div>
 
       <div style="padding: 15px 15px">
-        <button id="back-btn" class="btn-text" style="font-size: 0.9rem; color: var(--text-light)">
-          ← Kembali ke Home
-        </button>
+        <button id="back-btn" class="btn-text" style="font-size: 0.9rem; color: var(--text-light)"
+          data-i18n="editor.back"></button>
       </div>
 
       <div class="tools-container">
-        <span class="tool-label">Toolbox</span>
+        <span class="tool-label" data-i18n="editor.toolbox"></span>
+
         <div id="assets-container" class="assets-grid">
-          <p class="empty-hint">
-            Belum ada aset. Buat tanda tangan atau upload gambar dulu.
-          </p>
+          <p class="empty-hint" data-i18n="editor.empty_assets"></p>
         </div>
-        <button id="btn-create-signature" class="tool-btn">Tanda Tangan</button>
-        <button id="btn-add-text" class="tool-btn">Tambah Teks</button>
-        <button id="btn-add-checkbox" class="tool-btn">Tambah Ceklis</button>
-        <button id="btn-tool-stamp" class="tool-btn">Upload Gambar</button>
+
+        <button id="btn-create-signature" class="tool-btn" data-i18n="tool.sign"></button>
+        <button id="btn-add-text" class="tool-btn" data-i18n="tool.text"></button>
+        <button id="btn-add-checkbox" class="tool-btn" data-i18n="tool.check"></button>
+        <button id="btn-tool-stamp" class="tool-btn" data-i18n="tool.image"></button>
 
         <input type="file" id="stamp-file-input" accept="image/*" style="display: none" />
       </div>
 
       <div class="sidebar-footer">
-        <button id="btn-save-pdf" class="btn-primary" style="margin-bottom: 15px">
-          Download PDF
-        </button>
+        <button id="btn-save-pdf" class="btn-primary" style="margin-bottom: 15px"
+          data-i18n="editor.download_btn"></button>
 
         <div style="
             font-size: 0.75rem;
@@ -88,17 +64,17 @@
 
   <div id="signature-modal" class="modal-overlay hidden">
     <div class="modal-content signature-modal-wrapper">
-      <h3 class="modal-title">Buat Tanda Tangan</h3>
+      <h3 class="modal-title" data-i18n="modal.title">Buat Tanda Tangan</h3>
 
       <div class="modal-tabs">
-        <button class="tab-btn active" data-tab="draw">
-          <i class="fa-solid fa-pen-nib"></i> Gambar
+        <button class="tab-btn active" data-tab="draw" data-i18n="modal.tab_draw">
+          <i class="fa-solid fa-pen-nib"></i>
         </button>
-        <button class="tab-btn" data-tab="type">
-          <i class="fa-solid fa-keyboard"></i> Ketik
+        <button class="tab-btn" data-tab="type" data-i18n="modal.tab_type">
+          <i class="fa-solid fa-keyboard"></i>
         </button>
-        <button class="tab-btn" data-tab="image">
-          <i class="fa-solid fa-image"></i> Upload
+        <button class="tab-btn" data-tab="image" data-i18n="modal.tab_upload">
+          <i class="fa-solid fa-image"></i>
         </button>
       </div>
 
@@ -107,16 +83,13 @@
           <div class="canvas-wrapper">
             <div id="signature-pad-container" style="width: 100%; height: 200px"></div>
           </div>
-          <p class="helper-text">
-            Gambar tanda tangan Anda di area kotak di atas.
-          </p>
+          <p class="helper-text" data-i18n="modal.draw_hint"></p>
         </div>
 
         <div id="tab-content-type" class="tab-content hidden">
           <div class="input-group">
-            <input type="text" id="type-signature-input" placeholder="Ketik nama Anda disini..." maxlength="30" />
+            <input type="text" id="type-signature-input" placeholder="Ketik nama..." maxlength="30" />
           </div>
-
           <div class="font-selector-group" style="
               display: flex;
               gap: 10px;
@@ -145,32 +118,29 @@
         <div id="tab-content-image" class="tab-content hidden">
           <div class="upload-area" id="image-upload-area">
             <i class="fa-solid fa-cloud-arrow-up"></i>
-            <p>Klik atau Drag gambar tanda tangan kesini</p>
+            <p data-i18n="modal.upload_hint"></p>
             <input type="file" id="image-signature-input" accept="image/png, image/jpeg, image/jpg" hidden />
           </div>
           <div id="image-preview-container" class="hidden">
             <img id="image-signature-preview" src="" alt="Preview" />
-            <button id="btn-remove-image" class="btn-text danger">
-              Hapus Gambar
-            </button>
+            <button id="btn-remove-image" class="btn-text danger" data-i18n="modal.btn_remove_img"></button>
           </div>
         </div>
       </div>
 
       <div class="modal-footer-controls">
         <div class="color-picker-group" id="signature-color-picker">
-          <span class="label">Warna:</span>
-          <button class="color-btn active" data-color="#000000" style="background-color: #000000"
-            title="Hitam"></button>
-          <button class="color-btn" data-color="#0000FF" style="background-color: #0000ff" title="Biru"></button>
-          <button class="color-btn" data-color="#FF0000" style="background-color: #ff0000" title="Merah"></button>
+          <span class="label" data-i18n="modal.label_color"></span>
+          <button class="color-btn active" data-color="#000000" style="background-color: #000000"></button>
+          <button class="color-btn" data-color="#0000FF" style="background-color: #0000ff"></button>
+          <button class="color-btn" data-color="#FF0000" style="background-color: #ff0000"></button>
         </div>
 
         <div class="action-buttons">
-          <button id="btn-modal-clear" class="btn-text danger">Hapus</button>
+          <button id="btn-modal-clear" class="btn-text danger" data-i18n="modal.btn_clear"></button>
           <div class="right-actions">
-            <button id="btn-modal-cancel" class="btn-secondary">Batal</button>
-            <button id="btn-modal-save" class="btn-primary">Simpan</button>
+            <button id="btn-modal-cancel" class="btn-secondary" data-i18n="modal.btn_cancel"></button>
+            <button id="btn-modal-save" class="btn-primary" data-i18n="modal.btn_save"></button>
           </div>
         </div>
       </div>
