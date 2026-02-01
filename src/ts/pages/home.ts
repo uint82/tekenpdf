@@ -1,5 +1,6 @@
 import { router } from "../utils/router";
 import { appStore } from "../utils/store";
+import { setLanguage } from "../utils/i18n";
 import type { Page } from "../utils/router";
 
 export const HomePage: Page = {
@@ -8,32 +9,30 @@ export const HomePage: Page = {
     const view = document.getElementById("home-view");
     view?.classList.remove("hidden");
 
-    const input = document.getElementById("pdf-upload") as HTMLInputElement;
-    if (input) {
-      input.onchange = (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        handleFile(file);
-      };
-    }
-
     const btnDemo = document.getElementById(
       "btn-try-demo",
     ) as HTMLButtonElement;
+
     if (btnDemo) {
       btnDemo.disabled = false;
-      btnDemo.innerHTML =
-        '<i class="fa-regular fa-file-pdf"></i> Coba Pakai File Demo';
+      btnDemo.innerHTML = '<i class="fa-regular fa-file-pdf"></i> ';
+
+      const currentLang = (localStorage.getItem("lang") || "en") as "en" | "id";
+      setLanguage(currentLang);
 
       btnDemo.onclick = async () => {
-        btnDemo.innerHTML =
-          '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
+        const originalContent = btnDemo.innerHTML;
+
+        btnDemo.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
         btnDemo.disabled = true;
 
         try {
           const response = await fetch("/demo/demo.pdf");
+
           if (!response.ok) throw new Error("Gagal memuat file demo");
 
           const blob = await response.blob();
+
           const file = new File([blob], "Demo_Document.pdf", {
             type: "application/pdf",
             lastModified: new Date().getTime(),
@@ -41,13 +40,22 @@ export const HomePage: Page = {
 
           handleFile(file);
         } catch (error) {
-          console.error(error);
-          alert("Gagal memuat demo.");
+          console.error("Demo Load Error:", error);
+          alert(
+            "Gagal memuat file demo. Pastikan file '/demo/demo.pdf' tersedia.",
+          );
 
+          btnDemo.innerHTML = originalContent;
           btnDemo.disabled = false;
-          btnDemo.innerHTML =
-            '<i class="fa-regular fa-file-pdf"></i> Coba Pakai File Demo';
         }
+      };
+    }
+
+    const input = document.getElementById("pdf-upload") as HTMLInputElement;
+    if (input) {
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        handleFile(file);
       };
     }
 
@@ -60,9 +68,7 @@ export const HomePage: Page = {
       ["dragenter", "dragover"].forEach((eventName) => {
         dropZone.addEventListener(
           eventName,
-          () => {
-            dropZone.classList.add("drag-active");
-          },
+          () => dropZone.classList.add("drag-active"),
           false,
         );
       });
@@ -70,9 +76,7 @@ export const HomePage: Page = {
       ["dragleave", "drop"].forEach((eventName) => {
         dropZone.addEventListener(
           eventName,
-          () => {
-            dropZone.classList.remove("drag-active");
-          },
+          () => dropZone.classList.remove("drag-active"),
           false,
         );
       });
