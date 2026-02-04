@@ -2,21 +2,56 @@
   <div class="editor-layout">
     <main id="canvas-scroll-area">
       <div id="pages-container"></div>
-
-      <div id="floating-context-menu" class="floating-menu hidden"></div>
+      <div id="floating-context-menu" class="floating-menu hidden">
+        <div class="menu-actions">
+          <button id="ctx-color" class="ctx-btn" title="Warna">
+            <i class="fa-solid fa-palette"></i>
+          </button>
+          <button id="ctx-duplicate" class="ctx-btn" title="Duplikasi">
+            <i class="fa-regular fa-clone"></i>
+          </button>
+          <button
+            id="ctx-duplicate-all"
+            class="ctx-btn"
+            title="Duplikasi Semua Hal"
+          >
+            <i class="fa-solid fa-layer-group"></i>
+          </button>
+          <div class="ctx-divider"></div>
+          <button id="ctx-delete" class="ctx-btn delete" title="Hapus">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+        <div id="ctx-color-picker" class="color-options hidden">
+          <button
+            class="color-dot"
+            data-color="#000000"
+            style="background: #000"
+          ></button>
+          <button
+            class="color-dot"
+            data-color="#0000FF"
+            style="background: #0000ff"
+          ></button>
+          <button
+            class="color-dot"
+            data-color="#FF0000"
+            style="background: #ff0000"
+          ></button>
+        </div>
+      </div>
     </main>
 
     <aside class="editor-sidebar">
-      <div class="sidebar-header" style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 15px;
-        ">
+      <div class="sidebar-header">
         <div style="font-weight: 800; font-size: 1.1rem">
           Tekenpdf <i class="fa-solid fa-signature"></i>
         </div>
-        <button id="theme-toggle-sidebar" class="btn-text" style="font-size: 1.2rem"></button>
+        <button
+          id="theme-toggle-sidebar"
+          class="btn-text"
+          style="font-size: 1.2rem"
+        ></button>
       </div>
 
       <div class="file-info-card">
@@ -24,39 +59,108 @@
         <span id="filename-display" data-i18n="editor.loading"></span>
       </div>
 
-      <div style="padding: 15px 15px">
-        <button id="back-btn" class="btn-text" style="font-size: 0.9rem; color: var(--text-light)"
-          data-i18n="editor.back"></button>
+      <div style="padding: 15px 15px 0 15px">
+        <button
+          id="back-btn"
+          class="btn-text"
+          style="font-size: 0.9rem; color: var(--text-light)"
+          data-i18n="editor.back"
+        ></button>
       </div>
 
-      <div class="tools-container">
-        <span class="tool-label" data-i18n="editor.toolbox"></span>
-
-        <div id="assets-container" class="assets-grid">
-          <p class="empty-hint" data-i18n="editor.empty_assets"></p>
+      <div class="tools-container scrollable">
+        <div class="tool-section">
+          <span class="tool-label" data-i18n="editor.toolbox"></span>
+          <div class="tools-grid-row">
+            <button
+              id="btn-add-text"
+              class="tool-btn compact"
+              data-i18n="tool.text"
+            >
+              <i class="fa-solid fa-font"></i>
+            </button>
+            <button
+              id="btn-add-checkbox"
+              class="tool-btn compact"
+              data-i18n="tool.check"
+            >
+              <i class="fa-regular fa-square-check"></i>
+            </button>
+          </div>
         </div>
 
-        <button id="btn-create-signature" class="tool-btn" data-i18n="tool.sign"></button>
-        <button id="btn-add-text" class="tool-btn" data-i18n="tool.text"></button>
-        <button id="btn-add-checkbox" class="tool-btn" data-i18n="tool.check"></button>
-        <button id="btn-tool-stamp" class="tool-btn" data-i18n="tool.image"></button>
+        <div class="accordion-item active" id="acc-signature">
+          <button class="accordion-header">
+            <div class="header-label">
+              <i class="fa-solid fa-signature"></i>
+              <span data-i18n="tool.sign">Signature</span>
+            </div>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+          </button>
 
-        <input type="file" id="stamp-file-input" accept="image/*" style="display: none" />
+          <div class="accordion-body">
+            <div id="assets-signature" class="assets-grid mini">
+              <p class="empty-hint" data-i18n="editor.empty_assets"></p>
+            </div>
+            <button id="btn-create-signature" class="btn-secondary full-width">
+              <i class="fa-solid fa-plus"></i>
+              <span data-i18n="modal.title">Create New</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="accordion-item" id="acc-stamp">
+          <button class="accordion-header">
+            <div class="header-label">
+              <i class="fa-regular fa-image"></i>
+              <span data-i18n="tool.image">Stamps & Images</span>
+            </div>
+            <i class="fa-solid fa-chevron-down arrow"></i>
+          </button>
+
+          <div class="accordion-body">
+            <div id="assets-stamp" class="assets-grid mini">
+              <p class="empty-hint" data-i18n="editor.empty_assets"></p>
+            </div>
+            <button id="btn-tool-stamp" class="btn-secondary full-width">
+              <i class="fa-solid fa-upload"></i>
+              <span data-i18n="modal.tab_upload">Upload</span>
+            </button>
+            <input
+              type="file"
+              id="stamp-file-input"
+              accept="image/*"
+              style="display: none"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="sidebar-footer">
-        <button id="btn-save-pdf" class="btn-primary" style="margin-bottom: 15px"
-          data-i18n="editor.download_btn"></button>
+        <button
+          id="btn-save-pdf"
+          class="btn-primary"
+          style="margin-bottom: 15px"
+          data-i18n="editor.download_btn"
+        >
+          <i class="fa-solid fa-file-arrow-down"></i>
+        </button>
 
-        <div style="
+        <div
+          style="
             font-size: 0.75rem;
             color: var(--text-light);
             text-align: center;
             padding-top: 10px;
-          ">
+          "
+        >
           &copy; <span id="year-sidebar">2026</span> Tekenpdf.<br />
-          <a href="https://github.com/uint82/tekenpdf" target="_blank"
-            style="color: var(--text-light); text-decoration: underline">Github</a>
+          <a
+            href="https://github.com/uint82/tekenpdf"
+            target="_blank"
+            style="color: var(--text-light); text-decoration: underline"
+            >Github</a
+          >
         </div>
       </div>
     </aside>
@@ -64,10 +168,14 @@
 
   <div id="signature-modal" class="modal-overlay hidden">
     <div class="modal-content signature-modal-wrapper">
-      <h3 class="modal-title" data-i18n="modal.title">Buat Tanda Tangan</h3>
+      <h3 class="modal-title" data-i18n="modal.title"></h3>
 
       <div class="modal-tabs">
-        <button class="tab-btn active" data-tab="draw" data-i18n="modal.tab_draw">
+        <button
+          class="tab-btn active"
+          data-tab="draw"
+          data-i18n="modal.tab_draw"
+        >
           <i class="fa-solid fa-pen-nib"></i>
         </button>
         <button class="tab-btn" data-tab="type" data-i18n="modal.tab_type">
@@ -81,32 +189,52 @@
       <div class="modal-body">
         <div id="tab-content-draw" class="tab-content active">
           <div class="canvas-wrapper">
-            <div id="signature-pad-container" style="width: 100%; height: 200px"></div>
+            <div
+              id="signature-pad-container"
+              style="width: 100%; height: 200px"
+            ></div>
           </div>
           <p class="helper-text" data-i18n="modal.draw_hint"></p>
         </div>
 
         <div id="tab-content-type" class="tab-content hidden">
           <div class="input-group">
-            <input type="text" id="type-signature-input" placeholder="Ketik nama..." maxlength="30" />
+            <input
+              type="text"
+              id="type-signature-input"
+              placeholder="Ketik nama..."
+              maxlength="30"
+            />
           </div>
-          <div class="font-selector-group" style="
+          <div
+            class="font-selector-group"
+            style="
               display: flex;
               gap: 10px;
               margin-bottom: 15px;
               justify-content: center;
               flex-wrap: wrap;
-            ">
-            <button class="font-btn active" data-font="'Caveat', cursive"
-              style="font-family: &quot;Caveat&quot;, cursive">
+            "
+          >
+            <button
+              class="font-btn active"
+              data-font="'Caveat', cursive"
+              style="font-family: &quot;Caveat&quot;, cursive"
+            >
               Caveat
             </button>
-            <button class="font-btn" data-font="'La Belle Aurore', cursive"
-              style="font-family: &quot;La Belle Aurore&quot;, cursive">
+            <button
+              class="font-btn"
+              data-font="'La Belle Aurore', cursive"
+              style="font-family: &quot;La Belle Aurore&quot;, cursive"
+            >
               La Belle Aurore
             </button>
-            <button class="font-btn" data-font="'Dancing Script', cursive"
-              style="font-family: &quot;Dancing Script&quot;, cursive">
+            <button
+              class="font-btn"
+              data-font="'Dancing Script', cursive"
+              style="font-family: &quot;Dancing Script&quot;, cursive"
+            >
               Dancing Script
             </button>
           </div>
@@ -119,11 +247,20 @@
           <div class="upload-area" id="image-upload-area">
             <i class="fa-solid fa-cloud-arrow-up"></i>
             <p data-i18n="modal.upload_hint"></p>
-            <input type="file" id="image-signature-input" accept="image/png, image/jpeg, image/jpg" hidden />
+            <input
+              type="file"
+              id="image-signature-input"
+              accept="image/png, image/jpeg, image/jpg"
+              hidden
+            />
           </div>
           <div id="image-preview-container" class="hidden">
             <img id="image-signature-preview" src="" alt="Preview" />
-            <button id="btn-remove-image" class="btn-text danger" data-i18n="modal.btn_remove_img"></button>
+            <button
+              id="btn-remove-image"
+              class="btn-text danger"
+              data-i18n="modal.btn_remove_img"
+            ></button>
           </div>
         </div>
       </div>
@@ -131,16 +268,42 @@
       <div class="modal-footer-controls">
         <div class="color-picker-group" id="signature-color-picker">
           <span class="label" data-i18n="modal.label_color"></span>
-          <button class="color-btn active" data-color="#000000" style="background-color: #000000"></button>
-          <button class="color-btn" data-color="#0000FF" style="background-color: #0000ff"></button>
-          <button class="color-btn" data-color="#FF0000" style="background-color: #ff0000"></button>
+          <button
+            class="color-btn active"
+            data-color="#000000"
+            style="background-color: #000000"
+          ></button>
+          <button
+            class="color-btn"
+            data-color="#0000FF"
+            style="background-color: #0000ff"
+          ></button>
+          <button
+            class="color-btn"
+            data-color="#FF0000"
+            style="background-color: #ff0000"
+          ></button>
         </div>
 
         <div class="action-buttons">
-          <button id="btn-modal-clear" class="btn-text danger" data-i18n="modal.btn_clear"></button>
+          <button
+            id="btn-modal-clear"
+            class="btn-text danger"
+            data-i18n="modal.btn_clear"
+          >
+            <i class="fa-regular fa-trash-can"></i>
+          </button>
           <div class="right-actions">
-            <button id="btn-modal-cancel" class="btn-secondary" data-i18n="modal.btn_cancel"></button>
-            <button id="btn-modal-save" class="btn-primary" data-i18n="modal.btn_save"></button>
+            <button
+              id="btn-modal-cancel"
+              class="btn-secondary"
+              data-i18n="modal.btn_cancel"
+            ></button>
+            <button
+              id="btn-modal-save"
+              class="btn-primary"
+              data-i18n="modal.btn_save"
+            ></button>
           </div>
         </div>
       </div>
