@@ -9,3 +9,5 @@ Fungsi saat ini:
 - stampel
 - gambar
 - font
+
+by uint82
