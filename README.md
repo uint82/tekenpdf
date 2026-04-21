@@ -2,7 +2,7 @@ Todo:
 - add new feature
 - improve UI/UX
 - optimize at pdf rendering
--optimize image rendering
+- optimize image rendering
 
 Fungsi saat ini:
 - tanda tangan
