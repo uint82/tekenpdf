@@ -11,4 +11,4 @@ Fungsi saat ini:
 - font
 
 by uint82
-made with love
+made with ❤️
